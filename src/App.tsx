@@ -13,7 +13,9 @@ function App() {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">File Viewer</h1>
       <FileUpload onFileUpload={handleFileUpload} />
-     <div className="justify-items-center place-content-center">{file && <FileViewer file={file} />}</div>
+      <div className="justify-items-center place-content-center">
+        {file && <FileViewer file={file} />}
+      </div>
     </div>
   );
 }
