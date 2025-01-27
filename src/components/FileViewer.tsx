@@ -16,6 +16,7 @@ type ShapeType =
 
 const FileViewer = ({ file }: FileViewerProps) => {
   const [imageUrl, setImageUrl] = useState<string>("");
+<<<<<<< Updated upstream
   const [error, setError] = useState<string | null>(null);
   const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
   const [activeShape, setActiveShape] = useState<ShapeType>(null);
@@ -25,9 +26,12 @@ const FileViewer = ({ file }: FileViewerProps) => {
   const [fillColor, setFillColor] = useState("transparent");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
+=======
+>>>>>>> Stashed changes
 
   // Initialize Fabric canvas
   useEffect(() => {
+<<<<<<< Updated upstream
     if (!canvasRef.current) return;
 
     const fabricCanvas = new fabric.Canvas(canvasRef.current, {
@@ -271,10 +275,73 @@ const FileViewer = ({ file }: FileViewerProps) => {
       }
     });
     canvas.renderAll();
+=======
+    const type = file.type || file.name.split(".").pop()?.toLowerCase();
+    setFileType(type || "");
+
+    const handlePdf = () => {
+      // No additional handling needed for PDFs
+    };
+
+    const handleDoc = async () => {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        setDocContent(result.value);
+      } catch (error) {
+        setDocContent("Failed to read the document.");
+      }
+    };
+
+    const handleXls = async () => {
+      try {
+        const rows = await readXlsxFile(file);
+        setXlsContent(rows);
+      } catch (error) {
+        setXlsContent([["Failed to read the spreadsheet."]]);
+      }
+    };
+
+    const handleImage = () => {
+      setImageUrl(URL.createObjectURL(file));
+    };
+
+    const handleMsg = () => {
+      setDocContent("MSG files are not supported.");
+    };
+
+    switch (type) {
+      case "application/pdf":
+        handlePdf();
+        break;
+      case "application/msword":
+      case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        handleDoc();
+        break;
+      case "application/vnd.ms-excel":
+      case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+        handleXls();
+        break;
+      case "image/jpeg":
+      case "image/png":
+        handleImage();
+        break;
+      case "application/vnd.ms-outlook":
+        handleMsg();
+        break;
+      default:
+        setDocContent("Unsupported file type.");
+    }
+  }, [file]);
+
+  const onPdfLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setPdfPages(numPages);
+>>>>>>> Stashed changes
   };
 
   return (
     <div className="mt-4">
+<<<<<<< Updated upstream
       {error && <div className="text-red-500 mb-4">{error}</div>}
       {!error && (
         <div className="flex flex-col gap-4">
@@ -379,7 +446,33 @@ const FileViewer = ({ file }: FileViewerProps) => {
             <canvas ref={canvasRef} />
           </div>
         </div>
+=======
+      {fileType === "application/pdf" && (
+        <Document file={URL.createObjectURL(file)} onLoadSuccess={onPdfLoadSuccess}>
+          {Array.from(new Array(pdfPages), (_, index) => (
+            <Page key={`page_${index + 1}`} pageNumber={index + 1} />
+          ))}
+        </Document>
       )}
+      {fileType.startsWith("image/") && <img src={imageUrl} alt="Uploaded" className="max-w-full" />}
+      {fileType.includes("document") && <pre>{docContent}</pre>}
+      {fileType.includes("excel") && (
+        <table className="border-collapse border border-gray-400">
+          <tbody>
+            {xlsContent.map((row, i) => (
+              <tr key={i}>
+                {row.map((cell: any, j: number) => (
+                  <td key={j} className="border border-gray-400 p-2">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+>>>>>>> Stashed changes
+      )}
+      {fileType === "application/vnd.ms-outlook" && <pre>{docContent}</pre>}
     </div>
   );
 };
