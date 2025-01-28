@@ -6,7 +6,6 @@ import {
   Square,
   Triangle,
   Circle as CircleIcon,
-  Hexagon,
   ChevronDown,
   Trash2,
   Minus,
@@ -31,7 +30,6 @@ type ShapeType =
   | "rectangle"
   | "triangle"
   | "ellipse"
-  | "polygon"
   | "text"
   | null;
 
@@ -59,7 +57,6 @@ const shapeOptions: ShapeOption[] = [
     icon: <CircleIcon className="w-4 h-4 transform scale-x-150" />,
     label: "Ellipse",
   },
-  { type: "polygon", icon: <Hexagon className="w-4 h-4" />, label: "Polygon" },
 ];
 
 const fontSizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
@@ -104,11 +101,11 @@ const FileViewer = ({ file }: FileViewerProps) => {
   const [strokeColor, setStrokeColor] = useState("#000000");
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [fillColor, setFillColor] = useState("transparent");
-  const [showShapeDropdown, setShowShapeDropdown] = useState(false);
+  const [showShapeDropdown, setShowShapeDropdown] = useState(true);
   const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(
     null
   );
-  const [isSelectionMode, setIsSelectionMode] = useState(true);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [isTextMode, setIsTextMode] = useState(false);
   const [fontSize, setFontSize] = useState(20);
   const [fontFamily, setFontFamily] = useState("Arial");
@@ -175,12 +172,21 @@ const FileViewer = ({ file }: FileViewerProps) => {
           selectable: isSelectionMode,
           hasControls: isSelectionMode,
           hasBorders: isSelectionMode,
+          lockMovementX: !isSelectionMode,
+          lockMovementY: !isSelectionMode,
         });
       }
     });
 
     canvas.selection = isSelectionMode;
     canvas.defaultCursor = isSelectionMode ? "default" : "crosshair";
+    canvas.hoverCursor = isSelectionMode ? "move" : "crosshair";
+    canvas.interactive = isSelectionMode;
+    
+    if (!isSelectionMode) {
+      canvas.discardActiveObject();
+    }
+    
     canvas.renderAll();
   }, [canvas, isSelectionMode]);
 
@@ -244,6 +250,11 @@ const FileViewer = ({ file }: FileViewerProps) => {
       fill: fillColor,
       left: pointer.x,
       top: pointer.y,
+      selectable: isSelectionMode,
+      hasControls: isSelectionMode,
+      hasBorders: isSelectionMode,
+      lockMovementX: !isSelectionMode,
+      lockMovementY: !isSelectionMode,
     };
 
     switch (activeShape) {
@@ -275,17 +286,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
           rx: 0,
           ry: 0,
         });
-      case "polygon":
-        return new fabric.Polygon(
-          [
-            { x: pointer.x, y: pointer.y },
-            { x: pointer.x, y: pointer.y },
-            { x: pointer.x, y: pointer.y },
-          ],
-          {
-            ...shapeProps,
-          }
-        );
       default:
         return null;
     }
@@ -340,6 +340,8 @@ const FileViewer = ({ file }: FileViewerProps) => {
     const handleMouseDown = (e: fabric.IEvent<Event>) => {
       if (!canvas) return;
 
+      if (isSelectionMode) return;
+
       const pointer = canvas.getPointer(e.e);
 
       if (isTextMode && !activeTextObj) {
@@ -361,6 +363,7 @@ const FileViewer = ({ file }: FileViewerProps) => {
       const shape = createShape({ x: pointer.x, y: pointer.y });
       if (shape) {
         canvas.add(shape);
+        canvas.setActiveObject(shape);
       }
     };
 
@@ -401,19 +404,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
             ry: Math.abs(pointer.y - startPointRef.current.y) / 2,
           });
           break;
-        case "polygon":
-          {
-            const points = [
-              new fabric.Point(
-                startPointRef.current.x,
-                startPointRef.current.y
-              ),
-              new fabric.Point(pointer.x, startPointRef.current.y),
-              new fabric.Point(pointer.x, pointer.y),
-            ];
-            (activeObject as fabric.Polygon).set({ points });
-          }
-          break;
       }
 
       canvas.renderAll();
@@ -439,7 +429,7 @@ const FileViewer = ({ file }: FileViewerProps) => {
       canvas.off("mouse:move", handleMouseMove);
       canvas.off("mouse:up", handleMouseUp);
     };
-  }, [canvas, activeShape, isDrawing, isTextMode, activeTextObj]);
+  }, [canvas, activeShape, isDrawing, isTextMode, activeTextObj, isSelectionMode]);
 
   useEffect(() => {
     if (!canvas) return;
@@ -656,6 +646,29 @@ const FileViewer = ({ file }: FileViewerProps) => {
     };
   }, [canvas]);
 
+  useEffect(() => {
+    if (!canvas) return;
+
+    const handleObjectAdded = (e: fabric.IEvent) => {
+      const obj = e.target;
+      if (obj && obj !== canvas.backgroundImage) {
+        obj.set({
+          selectable: isSelectionMode,
+          hasControls: isSelectionMode,
+          hasBorders: isSelectionMode,
+          lockMovementX: !isSelectionMode,
+          lockMovementY: !isSelectionMode,
+        });
+      }
+    };
+
+    canvas.on('object:added', handleObjectAdded);
+
+    return () => {
+      canvas.off('object:added', handleObjectAdded);
+    };
+  }, [canvas, isSelectionMode]);
+
   return (
     <div className="mt-4">
       {error && <div className="text-red-500 mb-4">{error}</div>}
@@ -668,319 +681,374 @@ const FileViewer = ({ file }: FileViewerProps) => {
             </div>
           </div>
 
-
           <div className="flex-1 max-w-md">
-  <div className="sticky top-4 space-y-4">
-    {/* Main Tools */}
-    <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
-      <h3 className="text-sm font-medium text-gray-700 mb-3">Tools</h3>
-      {/* Tool Selection Buttons */}
-      <div className="flex gap-2 mb-4">
-        <button
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
-            isSelectionMode
-              ? "bg-blue-500 text-white shadow-md"
-              : "bg-gray-50 hover:bg-gray-100 text-gray-700"
-          }`}
-          onClick={() => {
-            setIsSelectionMode(true);
-            setActiveShape(null);
-            setShowShapeDropdown(false);
-            setIsTextMode(false);
-            setShowTextControls(false);
-          }}
-        >
-          <MousePointer className="w-5 h-5" />
-          <span className="font-medium">Select</span>
-        </button>
-
-        <button
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
-            activeShape || showShapeDropdown
-              ? "bg-blue-500 text-white shadow-md"
-              : "bg-gray-50 hover:bg-gray-100 text-gray-700"
-          }`}
-          onClick={() => {
-            setShowShapeDropdown(!showShapeDropdown);
-            setIsSelectionMode(false);
-            setIsTextMode(false);
-            setShowTextControls(false);
-          }}
-        >
-          <Shapes className="w-5 h-5" />
-          <span className="font-medium">Shapes</span>
-        </button>
-
-        <button
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
-            isTextMode
-              ? "bg-blue-500 text-white shadow-md"
-              : "bg-gray-50 hover:bg-gray-100 text-gray-700"
-          }`}
-          onClick={() => {
-            setIsTextMode(!isTextMode);
-            setIsSelectionMode(false);
-            setActiveShape(null);
-            setShowShapeDropdown(false);
-            setShowTextControls(!isTextMode);
-          }}
-        >
-          <Type className="w-5 h-5" />
-          <span className="font-medium">Text</span>
-        </button>
-      </div>
-
-      {/* Dynamic Tool Content */}
-      <div className="space-y-4">
-        {/* Shape Tools */}
-        {showShapeDropdown && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-gray-600">Shape Options</h4>
-            <div className="grid grid-cols-2 gap-2">
-              {shapeOptions.map(({ type, icon, label }) => (
-                <button
-                  key={type}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-                    activeShape === type
-                      ? "bg-blue-50 text-blue-600"
-                      : "hover:bg-gray-50 text-gray-700"
-                  }`}
-                  onClick={() => {
-                    setActiveShape(activeShape === type ? null : type);
-                    setIsSelectionMode(false);
-                  }}
-                >
-                  {icon}
-                  <span className="text-sm">{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Text Tools */}
-        {isTextMode && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-gray-600">Text Options</h4>
-            <div className="grid gap-3">
-              <div className="flex gap-2">
-                <select
-                  value={fontFamily}
-                  onChange={(e) => setFontFamily(e.target.value)}
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200"
-                >
-                  {fontFamilies.map((font) => (
-                    <option key={font} value={font}>
-                      {font}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={fontSize}
-                  onChange={(e) => setFontSize(Number(e.target.value))}
-                  className="w-24 px-3 py-1.5 rounded-lg border border-gray-200"
-                >
-                  {fontSizes.map((size) => (
-                    <option key={size} value={size}>
-                      {size}px
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-1 p-1 border border-gray-200 rounded-lg">
-              <button
-                      className={`p-1 ${isBold ? "bg-gray-200" : ""}`}
-                      onClick={() => {
-                        setIsBold(!isBold);
-                        if (activeTextObj) {
-                          activeTextObj.set(
-                            "fontWeight",
-                            !isBold ? "bold" : "normal"
-                          );
-                          canvas?.renderAll();
-                        }
-                      }}
-                      title="Bold"
-                    >
-                      <Bold className="w-4 h-4" />
-                    </button>
-                    <button
-                      className={`p-1 ${isItalic ? "bg-gray-200" : ""}`}
-                      onClick={() => {
-                        setIsItalic(!isItalic);
-                        if (activeTextObj) {
-                          activeTextObj.set(
-                            "fontStyle",
-                            !isItalic ? "italic" : "normal"
-                          );
-                          canvas?.renderAll();
-                        }
-                      }}
-                      title="Italic"
-                    >
-                      <Italic className="w-4 h-4" />
-                    </button>
-                    <button
-                      className={`p-1 ${isStrikethrough ? "bg-gray-200" : ""}`}
-                      onClick={() => {
-                        setIsStrikethrough(!isStrikethrough);
-                        if (activeTextObj) {
-                          activeTextObj.set("underline", !isStrikethrough);
-                          canvas?.renderAll();
-                        }
-                      }}
-                      title="Strikethrough"
-                    >
-                      <Strikethrough className="w-4 h-4" />
-                    </button>
-                    <div className="w-px h-4 bg-gray-300 mx-1" />
-                    <button
-                      className={`p-1 ${
-                        textAlign === "left" ? "bg-gray-200" : ""
-                      }`}
-                      onClick={() => setTextAlign("left")}
-                    >
-                      <AlignLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      className={`p-1 ${
-                        textAlign === "center" ? "bg-gray-200" : ""
-                      }`}
-                      onClick={() => setTextAlign("center")}
-                    >
-                      <AlignCenter className="w-4 h-4" />
-                    </button>
-                    <button
-                      className={`p-1 ${
-                        textAlign === "right" ? "bg-gray-200" : ""
-                      }`}
-                      onClick={() => setTextAlign("right")}
-                    >
-                      <AlignRight className="w-4 h-4" />
-                    </button>
-                {/* ... existing text formatting buttons ... */}
-                <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium">Color:</label>
-                    <div className="relative">
-                      <input
-                        type="color"
-                        value={strokeColor}
-                        onChange={(e) => setStrokeColor(e.target.value)}
-                        className="w-8 h-8 cursor-pointer opacity-0 absolute"
-                      />
-                      <div className="w-8 h-8 rounded border border-gray-300 flex items-center justify-center">
-                        <div
-                          className="w-6 h-6 rounded"
-                          style={{ backgroundColor: strokeColor }}
-                        />
-                      </div>
-                    </div>
-                  </div>
+            <div className="sticky top-4 space-y-4">
+              {/* Main Tools */}
+              <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  Tools
+                </h3>
+                {/* Tool Selection Buttons */}
+                <div className="flex gap-2 mb-4">
+                  <button
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                      isSelectionMode
+                        ? "bg-blue-500 text-white shadow-md"
+                        : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+                    }`}
+                    onClick={() => {
+                      setIsSelectionMode(true);
+                      setActiveShape(null);
+                      setShowShapeDropdown(false);
+                      setIsTextMode(false);
+                      setShowTextControls(false);
+                    }}
+                  >
+                    <MousePointer className="w-5 h-5" />
+                    <span className="font-medium">Select</span>
+                  </button>
 
                   <button
-                    className="ml-auto flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    onClick={handleDoneEditing}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                      activeShape || showShapeDropdown
+                        ? "bg-blue-500 text-white shadow-md"
+                        : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+                    }`}
+                    onClick={() => {
+                      setShowShapeDropdown(!showShapeDropdown);
+                      setIsSelectionMode(false);
+                      setIsTextMode(false);
+                      setShowTextControls(false);
+                    }}
                   >
-                    <Check className="w-4 h-4" />
-                    <span>Done</span>
+                    <Shapes className="w-5 h-5" />
+                    <span className="font-medium">Shapes</span>
                   </button>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Style Controls - Only show when a shape/text is selected or in text mode */}
-        {(selectedObject) && (
-          <div className="space-y-3 pt-3 border-t border-gray-200">
-            <h4 className="text-sm font-medium text-gray-600">Style</h4>
-            <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-600">Stroke Color</label>
-                        <div className="flex items-center gap-2">
-                          <div className="relative">
-                            <input
-                              type="color"
-                              value={strokeColor}
-                              onChange={(e) => {
-                                setStrokeColor(e.target.value);
-                                updateSelectedObject();
-                              }}
-                              className="w-10 h-10 cursor-pointer opacity-0 absolute"
-                            />
-                            <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
-                              <div
-                                className="w-8 h-8 rounded"
-                                style={{ backgroundColor: strokeColor }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                  <button
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                      isTextMode
+                        ? "bg-blue-500 text-white shadow-md"
+                        : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+                    }`}
+                    onClick={() => {
+                      setIsTextMode(!isTextMode);
+                      setIsSelectionMode(false);
+                      setActiveShape(null);
+                      setShowShapeDropdown(false);
+                      setShowTextControls(!isTextMode);
+                    }}
+                  >
+                    <Type className="w-5 h-5" />
+                    <span className="font-medium">Text</span>
+                  </button>
+                </div>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-600">Fill Color</label>
-                        <div className="flex items-center gap-2">
-                          <div className="relative">
-                            <input
-                              type="color"
-                              value={fillColor === "transparent" ? "#ffffff" : fillColor}
-                              onChange={(e) => {
-                                setFillColor(e.target.value);
-                                updateSelectedObject();
-                              }}
-                              className="w-10 h-10 cursor-pointer opacity-0 absolute"
-                            />
-                            <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
-                              <div
-                                className="w-8 h-8 rounded"
-                                style={{
-                                  backgroundColor: fillColor,
-                                  backgroundImage:
-                                    fillColor === "transparent"
-                                      ? "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)"
-                                      : undefined,
-                                  backgroundSize: "8px 8px",
-                                  backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
-                                }}
-                              />
-                            </div>
-                          </div>
+                {/* Dynamic Tool Content */}
+                <div className="space-y-4">
+                  {/* Shape Tools */}
+                  {showShapeDropdown && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-gray-600">
+                        Shape Options
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {shapeOptions.map(({ type, icon, label }) => (
                           <button
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                              fillColor === "transparent"
-                                ? "bg-blue-500 text-white shadow-sm"
-                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            key={type}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                              activeShape === type
+                                ? "bg-blue-50 text-blue-600"
+                                : "hover:bg-gray-50 text-gray-700"
                             }`}
                             onClick={() => {
-                              setFillColor(
-                                fillColor === "transparent" ? "#ffffff" : "transparent"
+                              setActiveShape(
+                                activeShape === type ? null : type
                               );
-                              updateSelectedObject();
+                              setIsSelectionMode(false);
                             }}
                           >
-                            Transparent
+                            {icon}
+                            <span className="text-sm">{label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Text Tools */}
+                  {isTextMode && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-gray-600">
+                        Text Options
+                      </h4>
+                      <div className="grid gap-3">
+                        <div className="flex gap-2">
+                          <select
+                            value={fontFamily}
+                            onChange={(e) => setFontFamily(e.target.value)}
+                            className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200"
+                          >
+                            {fontFamilies.map((font) => (
+                              <option key={font} value={font}>
+                                {font}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={fontSize}
+                            onChange={(e) =>
+                              setFontSize(Number(e.target.value))
+                            }
+                            className="w-24 px-3 py-1.5 rounded-lg border border-gray-200"
+                          >
+                            {fontSizes.map((size) => (
+                              <option key={size} value={size}>
+                                {size}px
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-1 p-1 border border-gray-200 rounded-lg">
+                          <button
+                            className={`p-1 ${isBold ? "bg-gray-200" : ""}`}
+                            onClick={() => {
+                              setIsBold(!isBold);
+                              if (activeTextObj) {
+                                activeTextObj.set(
+                                  "fontWeight",
+                                  !isBold ? "bold" : "normal"
+                                );
+                                canvas?.renderAll();
+                              }
+                            }}
+                            title="Bold"
+                          >
+                            <Bold className="w-4 h-4" />
+                          </button>
+                          <button
+                            className={`p-1 ${isItalic ? "bg-gray-200" : ""}`}
+                            onClick={() => {
+                              setIsItalic(!isItalic);
+                              if (activeTextObj) {
+                                activeTextObj.set(
+                                  "fontStyle",
+                                  !isItalic ? "italic" : "normal"
+                                );
+                                canvas?.renderAll();
+                              }
+                            }}
+                            title="Italic"
+                          >
+                            <Italic className="w-4 h-4" />
+                          </button>
+                          <button
+                            className={`p-1 ${
+                              isStrikethrough ? "bg-gray-200" : ""
+                            }`}
+                            onClick={() => {
+                              setIsStrikethrough(!isStrikethrough);
+                              if (activeTextObj) {
+                                activeTextObj.set(
+                                  "underline",
+                                  !isStrikethrough
+                                );
+                                canvas?.renderAll();
+                              }
+                            }}
+                            title="Strikethrough"
+                          >
+                            <Strikethrough className="w-4 h-4" />
+                          </button>
+                          <div className="w-px h-4 bg-gray-300 mx-1" />
+                          <button
+                            className={`p-1 ${
+                              textAlign === "left" ? "bg-gray-200" : ""
+                            }`}
+                            onClick={() => setTextAlign("left")}
+                          >
+                            <AlignLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            className={`p-1 ${
+                              textAlign === "center" ? "bg-gray-200" : ""
+                            }`}
+                            onClick={() => setTextAlign("center")}
+                          >
+                            <AlignCenter className="w-4 h-4" />
+                          </button>
+                          <button
+                            className={`p-1 ${
+                              textAlign === "right" ? "bg-gray-200" : ""
+                            }`}
+                            onClick={() => setTextAlign("right")}
+                          >
+                            <AlignRight className="w-4 h-4" />
+                          </button>
+                          {/* ... existing text formatting buttons ... */}
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium">
+                              Color:
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="color"
+                                value={strokeColor}
+                                onChange={(e) => setStrokeColor(e.target.value)}
+                                className="w-8 h-8 cursor-pointer opacity-0 absolute"
+                              />
+                              <div className="w-8 h-8 rounded border border-gray-300 flex items-center justify-center">
+                                <div
+                                  className="w-6 h-6 rounded"
+                                  style={{ backgroundColor: strokeColor }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            className="ml-auto flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            onClick={handleDoneEditing}
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>Done</span>
                           </button>
                         </div>
                       </div>
                     </div>
-          </div>
-        )}
+                  )}
 
-        {/* Clear Canvas Button - Always visible */}
-        <div className="pt-3 border-t border-gray-200">
-          <button
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all"
-            onClick={handleClearCanvas}
-          >
-            <Trash2 className="w-5 h-5" />
-            <span className="font-medium">Clear Canvas</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+                  {selectedObject && !isTextMode && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-3 pt-3 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-600">
+                          Style
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-600">
+                              Stroke Color
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <div className="relative">
+                                <input
+                                  type="color"
+                                  value={strokeColor}
+                                  onChange={(e) => {
+                                    setStrokeColor(e.target.value);
+                                    updateSelectedObject();
+                                  }}
+                                  className="w-10 h-10 cursor-pointer opacity-0 absolute"
+                                />
+                                <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
+                                  <div
+                                    className="w-8 h-8 rounded"
+                                    style={{ backgroundColor: strokeColor }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-600">
+                              Fill Color
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <div className="relative">
+                                <input
+                                  type="color"
+                                  value={
+                                    fillColor === "transparent"
+                                      ? "#ffffff"
+                                      : fillColor
+                                  }
+                                  onChange={(e) => {
+                                    setFillColor(e.target.value);
+                                    updateSelectedObject();
+                                  }}
+                                  className="w-10 h-10 cursor-pointer opacity-0 absolute"
+                                />
+                                <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
+                                  <div
+                                    className="w-8 h-8 rounded"
+                                    style={{
+                                      backgroundColor: fillColor,
+                                      backgroundImage:
+                                        fillColor === "transparent"
+                                          ? "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)"
+                                          : undefined,
+                                      backgroundSize: "8px 8px",
+                                      backgroundPosition:
+                                        "0 0, 0 4px, 4px -4px, -4px 0px",
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <button
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                  fillColor === "transparent"
+                                    ? "bg-blue-500 text-white shadow-sm"
+                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                }`}
+                                onClick={() => {
+                                  setFillColor(
+                                    fillColor === "transparent"
+                                      ? "#ffffff"
+                                      : "transparent"
+                                  );
+                                  updateSelectedObject();
+                                }}
+                              >
+                                Transparent
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-600">
+                            Stroke Width
+                          </label>
+                          <div className="flex items-center gap-4">
+                            <input
+                              type="range"
+                              min="1"
+                              max="20"
+                              value={strokeWidth}
+                              onChange={(e) => {
+                                setStrokeWidth(Number(e.target.value));
+                                updateSelectedObject();
+                              }}
+                              className="flex-1"
+                            />
+                            <span className="text-sm font-medium text-gray-600 w-12">
+                              {strokeWidth}px
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Clear Canvas Button - Always visible */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <button
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all"
+                      onClick={handleClearCanvas}
+                      disabled={
+                        !canvas || (canvas && canvas.getObjects().length <= 1)
+                      }
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      <span className="font-medium">Clear all</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
