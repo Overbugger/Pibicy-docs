@@ -142,9 +142,9 @@ const FileViewer = ({ file }: FileViewerProps) => {
     if (!canvasRef.current) return;
 
     const fabricCanvas = new fabric.Canvas(canvasRef.current, {
-      width: 600,
-      height: 400,
-      backgroundColor: "transparent",
+      width: 800,
+      height: 600,
+      backgroundColor: "#f8fafc",
       selection: true,
       preserveObjectStacking: true,
     });
@@ -660,221 +660,136 @@ const FileViewer = ({ file }: FileViewerProps) => {
     <div className="mt-4">
       {error && <div className="text-red-500 mb-4">{error}</div>}
       {!error && (
-        <div className="flex flex-col gap-4">
-          <div className="bg-white rounded-lg shadow">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 p-2 border-b border-gray-200">
+        <div className="flex gap-6">
+          {/* Canvas Section */}
+          <div className="flex-shrink-0">
+            <div className="sticky top-4 border border-gray-200 rounded-xl overflow-hidden shadow-lg bg-white">
+              <canvas ref={canvasRef} className="block" />
+            </div>
+          </div>
+
+
+          <div className="flex-1 max-w-md">
+  <div className="sticky top-4 space-y-4">
+    {/* Main Tools */}
+    <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+      <h3 className="text-sm font-medium text-gray-700 mb-3">Tools</h3>
+      {/* Tool Selection Buttons */}
+      <div className="flex gap-2 mb-4">
+        <button
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            isSelectionMode
+              ? "bg-blue-500 text-white shadow-md"
+              : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+          }`}
+          onClick={() => {
+            setIsSelectionMode(true);
+            setActiveShape(null);
+            setShowShapeDropdown(false);
+            setIsTextMode(false);
+            setShowTextControls(false);
+          }}
+        >
+          <MousePointer className="w-5 h-5" />
+          <span className="font-medium">Select</span>
+        </button>
+
+        <button
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            activeShape || showShapeDropdown
+              ? "bg-blue-500 text-white shadow-md"
+              : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+          }`}
+          onClick={() => {
+            setShowShapeDropdown(!showShapeDropdown);
+            setIsSelectionMode(false);
+            setIsTextMode(false);
+            setShowTextControls(false);
+          }}
+        >
+          <Shapes className="w-5 h-5" />
+          <span className="font-medium">Shapes</span>
+        </button>
+
+        <button
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            isTextMode
+              ? "bg-blue-500 text-white shadow-md"
+              : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+          }`}
+          onClick={() => {
+            setIsTextMode(!isTextMode);
+            setIsSelectionMode(false);
+            setActiveShape(null);
+            setShowShapeDropdown(false);
+            setShowTextControls(!isTextMode);
+          }}
+        >
+          <Type className="w-5 h-5" />
+          <span className="font-medium">Text</span>
+        </button>
+      </div>
+
+      {/* Dynamic Tool Content */}
+      <div className="space-y-4">
+        {/* Shape Tools */}
+        {showShapeDropdown && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-gray-600">Shape Options</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {shapeOptions.map(({ type, icon, label }) => (
                 <button
-                  className={`flex items-center gap-2 px-3 py-2 rounded ${
-                    isSelectionMode
-                      ? "bg-blue-500 text-white"
-                      : "hover:bg-gray-50"
+                  key={type}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                    activeShape === type
+                      ? "bg-blue-50 text-blue-600"
+                      : "hover:bg-gray-50 text-gray-700"
                   }`}
                   onClick={() => {
-                    setIsSelectionMode(true);
-                    setActiveShape(null);
-                    setShowShapeDropdown(false);
-                    setIsTextMode(false);
-                    setShowTextControls(false);
+                    setActiveShape(activeShape === type ? null : type);
+                    setIsSelectionMode(false);
                   }}
-                  title="Select and modify shapes"
                 >
-                  <MousePointer className="w-5 h-5" />
+                  {icon}
+                  <span className="text-sm">{label}</span>
                 </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    className={`flex items-center gap-2 px-3 py-2 rounded ${
-                      !isSelectionMode && showShapeDropdown
-                        ? "bg-gray-100"
-                        : "hover:bg-gray-50"
-                    } ${activeShape ? "bg-blue-500 text-white" : ""}`}
-                    onClick={() => {
-                      setShowShapeDropdown(!showShapeDropdown);
-                      setIsSelectionMode(false);
-                      setIsTextMode(false);
-                      setShowTextControls(false);
-                    }}
-                  >
-                    <Shapes className="w-5 h-5" />
-                    <span className="text-sm font-medium">Shapes</span>
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-
-                  {showShapeDropdown && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-                      {shapeOptions.map(({ type, icon, label }) => (
-                        <button
-                          key={type}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${
-                            activeShape === type
-                              ? "bg-blue-50 text-blue-600"
-                              : ""
-                          }`}
-                          onClick={() => {
-                            setActiveShape(activeShape === type ? null : type);
-                            setShowShapeDropdown(false);
-                            setIsSelectionMode(false);
-                          }}
-                        >
-                          {icon}
-                          <span>{label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  className={`flex items-center gap-2 px-3 py-2 rounded ${
-                    isTextMode ? "bg-blue-500 text-white" : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => {
-                    if (!isTextMode) {
-                      setIsTextMode(true);
-                      setIsSelectionMode(false);
-                      setActiveShape(null);
-                      setShowShapeDropdown(false);
-                      setShowTextControls(true);
-                    }
-                  }}
-                  title="Add text"
+        {/* Text Tools */}
+        {isTextMode && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-gray-600">Text Options</h4>
+            <div className="grid gap-3">
+              <div className="flex gap-2">
+                <select
+                  value={fontFamily}
+                  onChange={(e) => setFontFamily(e.target.value)}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200"
                 >
-                  <Type className="w-5 h-5" />
-                  <span className="text-sm font-medium">Text</span>
-                </button>
-
-                <div className="w-px h-6 bg-gray-200" />
-
-                <div
-                  className={`flex items-center gap-4 ${
-                    !selectedObject ? "opacity-50 pointer-events-none" : ""
-                  }`}
+                  {fontFamilies.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={fontSize}
+                  onChange={(e) => setFontSize(Number(e.target.value))}
+                  className="w-24 px-3 py-1.5 rounded-lg border border-gray-200"
                 >
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium">Stroke:</label>
-                    <div className="relative">
-                      <input
-                        type="color"
-                        value={strokeColor}
-                        onChange={(e) => {
-                          setStrokeColor(e.target.value);
-                          updateSelectedObject();
-                        }}
-                        className="w-8 h-8 cursor-pointer opacity-0 absolute"
-                      />
-                      <div className="w-8 h-8 rounded border border-gray-300 flex items-center justify-center">
-                        <div
-                          className="w-6 h-6 rounded"
-                          style={{ backgroundColor: strokeColor }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium">Fill:</label>
-                    <div className="relative">
-                      <input
-                        type="color"
-                        value={
-                          fillColor === "transparent" ? "#ffffff" : fillColor
-                        }
-                        onChange={(e) => {
-                          setFillColor(e.target.value);
-                          updateSelectedObject();
-                        }}
-                        className="w-8 h-8 cursor-pointer opacity-0 absolute"
-                      />
-                      <div className="w-8 h-8 rounded border border-gray-300 flex items-center justify-center">
-                        <div
-                          className="w-6 h-6 rounded"
-                          style={{
-                            backgroundColor: fillColor,
-                            backgroundImage:
-                              fillColor === "transparent"
-                                ? "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)"
-                                : undefined,
-                            backgroundSize: "6px 6px",
-                            backgroundPosition:
-                              "0 0, 0 3px, 3px -3px, -3px 0px",
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      className={`px-2 py-1 rounded text-sm ${
-                        fillColor === "transparent"
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-200 hover:bg-gray-300"
-                      }`}
-                      onClick={() => {
-                        setFillColor(
-                          fillColor === "transparent"
-                            ? "#ffffff"
-                            : "transparent"
-                        );
-                        updateSelectedObject();
-                      }}
-                    >
-                      Transparent
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium">Width:</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="20"
-                      value={strokeWidth}
-                      onChange={(e) => {
-                        setStrokeWidth(Number(e.target.value));
-                        updateSelectedObject();
-                      }}
-                      className="w-24"
-                    />
-                    <span className="text-sm w-8">{strokeWidth}px</span>
-                  </div>
-
-                  <button
-                    className="p-2 rounded hover:bg-gray-100"
-                    onClick={handleClearCanvas}
-                    title="Delete selected shape"
-                  >
-                    <Trash2 className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
+                  {fontSizes.map((size) => (
+                    <option key={size} value={size}>
+                      {size}px
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {showTextControls && (
-                <div className="flex items-center gap-4 p-2 border-b border-gray-200 bg-gray-50">
-                  <select
-                    value={fontFamily}
-                    onChange={(e) => setFontFamily(e.target.value)}
-                    className="px-2 py-1 border rounded"
-                  >
-                    {fontFamilies.map((font) => (
-                      <option key={font} value={font}>
-                        {font}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={fontSize}
-                    onChange={(e) => setFontSize(Number(e.target.value))}
-                    className="px-2 py-1 border rounded w-20"
-                  >
-                    {fontSizes.map((size) => (
-                      <option key={size} value={size}>
-                        {size}px
-                      </option>
-                    ))}
-                  </select>
-
-                  <div className="flex items-center gap-1 border rounded">
-                    <button
+              <div className="flex items-center gap-1 p-1 border border-gray-200 rounded-lg">
+              <button
                       className={`p-1 ${isBold ? "bg-gray-200" : ""}`}
                       onClick={() => {
                         setIsBold(!isBold);
@@ -944,9 +859,8 @@ const FileViewer = ({ file }: FileViewerProps) => {
                     >
                       <AlignRight className="w-4 h-4" />
                     </button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
+                {/* ... existing text formatting buttons ... */}
+                <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Color:</label>
                     <div className="relative">
                       <input
@@ -971,31 +885,102 @@ const FileViewer = ({ file }: FileViewerProps) => {
                     <Check className="w-4 h-4" />
                     <span>Done</span>
                   </button>
-                </div>
-              )}
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="relative border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
-            <canvas ref={canvasRef} />
-            {canvas && (
-              <>
-                {(canvas.getObjects().length > 1 ||
-                  activeShape ||
-                  isTextMode) && (
-                  <div className="absolute top-2 right-2 px-2 py-1 bg-white/80 rounded text-sm font-medium">
-                    {isSelectionMode
-                      ? "Selection Mode"
-                      : isTextMode
-                      ? "Type anything"
-                      : activeShape
-                      ? `Drawing ${activeShape}`
-                      : "Select a shape"}
-                  </div>
-                )}
-              </>
-            )}
+        {/* Style Controls - Only show when a shape/text is selected or in text mode */}
+        {(selectedObject) && (
+          <div className="space-y-3 pt-3 border-t border-gray-200">
+            <h4 className="text-sm font-medium text-gray-600">Style</h4>
+            <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-600">Stroke Color</label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <input
+                              type="color"
+                              value={strokeColor}
+                              onChange={(e) => {
+                                setStrokeColor(e.target.value);
+                                updateSelectedObject();
+                              }}
+                              className="w-10 h-10 cursor-pointer opacity-0 absolute"
+                            />
+                            <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
+                              <div
+                                className="w-8 h-8 rounded"
+                                style={{ backgroundColor: strokeColor }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-600">Fill Color</label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <input
+                              type="color"
+                              value={fillColor === "transparent" ? "#ffffff" : fillColor}
+                              onChange={(e) => {
+                                setFillColor(e.target.value);
+                                updateSelectedObject();
+                              }}
+                              className="w-10 h-10 cursor-pointer opacity-0 absolute"
+                            />
+                            <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
+                              <div
+                                className="w-8 h-8 rounded"
+                                style={{
+                                  backgroundColor: fillColor,
+                                  backgroundImage:
+                                    fillColor === "transparent"
+                                      ? "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)"
+                                      : undefined,
+                                  backgroundSize: "8px 8px",
+                                  backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                              fillColor === "transparent"
+                                ? "bg-blue-500 text-white shadow-sm"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}
+                            onClick={() => {
+                              setFillColor(
+                                fillColor === "transparent" ? "#ffffff" : "transparent"
+                              );
+                              updateSelectedObject();
+                            }}
+                          >
+                            Transparent
+                          </button>
+                        </div>
+                      </div>
+                    </div>
           </div>
+        )}
+
+        {/* Clear Canvas Button - Always visible */}
+        <div className="pt-3 border-t border-gray-200">
+          <button
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all"
+            onClick={handleClearCanvas}
+          >
+            <Trash2 className="w-5 h-5" />
+            <span className="font-medium">Clear Canvas</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
         </div>
       )}
     </div>
