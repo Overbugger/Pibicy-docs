@@ -20,7 +20,7 @@ import {
   Plus,
 } from "lucide-react";
 
-// import UnsavedChangesDialog from "./UnsavedChangesDialog";
+import UnsavedChangesDialog from "./UnsavedChangesDialog";
 
 interface FileViewerProps {
   file: File;
@@ -1075,11 +1075,11 @@ const FileViewer = ({ file }: FileViewerProps) => {
               </div>
             </div>
           </div>
-          {/* <UnsavedChangesDialog
+          <UnsavedChangesDialog
             isOpen={showModal}
             onClose={() => setShowModal(false)}
             onQuit={handleQuit}
-          /> */}
+          />
         </div>
       )}
     </div>

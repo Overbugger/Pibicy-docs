@@ -1,43 +1,21 @@
 import { useState } from "react";
-import FileUpload from "./components/FileUpload";
-import FileViewer from "./components/FileViewer";
+import { FileEditor } from './components/features/file-editor/FileEditor';
+import { FileUpload } from './components/FileUpload';
 
-function App() {
-  const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const handleFileUpload = async (uploadedFile: File) => {
-    setIsUploading(true);
-    // Simulate upload delay
-    // await new Promise((resolve) => setTimeout(resolve, 2000));
-    // console.log("Uploaded file:", file);
-    setIsUploading(false);
-    setFile(uploadedFile);
-  };
+export const App = () => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="relative min-h-[400px]">
-        <div
-          className={`transition-all duration-500 absolute inset-0 ${
-            file ? "opacity-0 pointer-events-none" : "opacity-100"
-          }`}
-        >
-          <FileUpload
-            onFileUpload={handleFileUpload}
-            isUploading={isUploading}
-          />
-        </div>
-
-        <div
-          className={`transition-all duration-500 absolute inset-0 ${
-            file ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          {file && <FileViewer file={file} />}
-        </div>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8">File Editor</h1>
+        
+        {!selectedFile ? (
+          <FileUpload onFileSelect={setSelectedFile} />
+        ) : (
+          <FileEditor file={selectedFile} />
+        )}
       </div>
     </div>
   );
-}
-
-export default App;
+};
