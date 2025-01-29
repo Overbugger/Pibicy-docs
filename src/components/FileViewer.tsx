@@ -6,7 +6,6 @@ import {
   Square,
   Triangle,
   Circle as CircleIcon,
-  ChevronDown,
   Trash2,
   Minus,
   MousePointer,
@@ -18,7 +17,10 @@ import {
   Bold,
   Italic,
   Strikethrough,
+  Plus,
 } from "lucide-react";
+
+import UnsavedChangesDialog from "./UnsavedChangesDialog";
 
 interface FileViewerProps {
   file: File;
@@ -121,6 +123,12 @@ const FileViewer = ({ file }: FileViewerProps) => {
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const [showModal, setShowModal] = useState(false);
+
+  const handleQuit = () => {
+    window.location.reload();
+  };
+
   const handleDeleteSelected = useCallback(() => {
     if (!canvas) return;
     const activeObjects = canvas.getActiveObjects();
@@ -182,11 +190,11 @@ const FileViewer = ({ file }: FileViewerProps) => {
     canvas.defaultCursor = isSelectionMode ? "default" : "crosshair";
     canvas.hoverCursor = isSelectionMode ? "move" : "crosshair";
     canvas.interactive = isSelectionMode;
-    
+
     if (!isSelectionMode) {
       canvas.discardActiveObject();
     }
-    
+
     canvas.renderAll();
   }, [canvas, isSelectionMode]);
 
@@ -429,7 +437,14 @@ const FileViewer = ({ file }: FileViewerProps) => {
       canvas.off("mouse:move", handleMouseMove);
       canvas.off("mouse:up", handleMouseUp);
     };
-  }, [canvas, activeShape, isDrawing, isTextMode, activeTextObj, isSelectionMode]);
+  }, [
+    canvas,
+    activeShape,
+    isDrawing,
+    isTextMode,
+    activeTextObj,
+    isSelectionMode,
+  ]);
 
   useEffect(() => {
     if (!canvas) return;
@@ -662,10 +677,10 @@ const FileViewer = ({ file }: FileViewerProps) => {
       }
     };
 
-    canvas.on('object:added', handleObjectAdded);
+    canvas.on("object:added", handleObjectAdded);
 
     return () => {
-      canvas.off('object:added', handleObjectAdded);
+      canvas.off("object:added", handleObjectAdded);
     };
   }, [canvas, isSelectionMode]);
 
@@ -676,8 +691,19 @@ const FileViewer = ({ file }: FileViewerProps) => {
         <div className="flex gap-6">
           {/* Canvas Section */}
           <div className="flex-shrink-0">
-            <div className="sticky top-4 border border-gray-200 rounded-xl overflow-hidden shadow-lg bg-white">
-              <canvas ref={canvasRef} className="block" />
+            <div className="sticky top-4 space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <button
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex gap-1 items-center"
+                  onClick={() => setShowModal(true)}
+                >
+                  <Plus className="w-5 h-5" />
+                  Add New
+                </button>
+              </div>
+              <div className="border border-gray-200 rounded-xl overflow-hidden shadow-lg bg-white">
+                <canvas ref={canvasRef} className="block" />
+              </div>
             </div>
           </div>
 
@@ -1049,6 +1075,11 @@ const FileViewer = ({ file }: FileViewerProps) => {
               </div>
             </div>
           </div>
+          <UnsavedChangesDialog
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+            onQuit={handleQuit}
+          />
         </div>
       )}
     </div>

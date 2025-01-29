@@ -8,8 +8,8 @@ function App() {
   const handleFileUpload = async (uploadedFile: File) => {
     setIsUploading(true);
     // Simulate upload delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.log("Uploaded file:", file);
+    // await new Promise((resolve) => setTimeout(resolve, 2000));
+    // console.log("Uploaded file:", file);
     setIsUploading(false);
     setFile(uploadedFile);
   };
@@ -22,9 +22,12 @@ function App() {
             file ? "opacity-0 pointer-events-none" : "opacity-100"
           }`}
         >
-          <FileUpload onFileUpload={handleFileUpload} isUploading={isUploading} />
+          <FileUpload
+            onFileUpload={handleFileUpload}
+            isUploading={isUploading}
+          />
         </div>
-        
+
         <div
           className={`transition-all duration-500 absolute inset-0 ${
             file ? "opacity-100" : "opacity-0 pointer-events-none"
