@@ -13,6 +13,8 @@ import {
   Eye,
   EyeOff,
   Plus,
+  Download,
+  Save,
 } from "lucide-react";
 import UnsavedChangesDialog from "./UnsavedChangesDialog";
 
@@ -66,6 +68,7 @@ const FileViewer = ({ file }: FileViewerProps) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [originalFormat, setOriginalFormat] = useState<string>("");
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -128,6 +131,7 @@ const FileViewer = ({ file }: FileViewerProps) => {
       return;
     }
 
+    setOriginalFormat(type);
     const url = URL.createObjectURL(file);
     setImageUrl(url);
 
@@ -503,16 +507,19 @@ const FileViewer = ({ file }: FileViewerProps) => {
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-    // Get the canvas data URL
+    // Get the canvas data URL with original format
+    const format = originalFormat.split('/')[1]; // Extract format from MIME type
     const dataUrl = canvas.toDataURL({
-      format: 'png',
+      format: format === 'jpeg' ? 'jpeg' : 'png',
       quality: 1,
       multiplier: 1
     });
 
     // Create a download link
     const link = document.createElement('a');
-    link.download = `edited_${file.name.split('.')[0]}.png`;
+    const originalName = file.name.split('.');
+    const extension = originalName.pop();
+    link.download = `${originalName.join('.')}_edited.${extension}`;
     link.href = dataUrl;
     document.body.appendChild(link);
     link.click();
@@ -520,6 +527,37 @@ const FileViewer = ({ file }: FileViewerProps) => {
 
     setHasUnsavedChanges(false);
     setShowUnsavedDialog(false);
+  };
+
+  const handleSaveOriginal = () => {
+    if (!canvas) return;
+
+    // Get the canvas data
+    const dataUrl = canvas.toDataURL({
+      format: originalFormat.split('/')[1],
+      quality: 1,
+      multiplier: 1
+    });
+
+    // Convert data URL to Blob
+    fetch(dataUrl)
+      .then(res => res.blob())
+      .then(blob => {
+        // Create a new file with original format
+        const newFile = new File([blob], file.name, { type: originalFormat });
+        
+        // Create download link
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(newFile);
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
+        setHasUnsavedChanges(false);
+        setShowUnsavedDialog(false);
+      });
   };
 
   return (
@@ -541,13 +579,22 @@ const FileViewer = ({ file }: FileViewerProps) => {
               <span>Back</span>
             </button>
 
-            <button
-              onClick={handleAddNew}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add New</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveOriginal}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
+              >
+                <Save className="w-5 h-5" />
+                <span>Save Original</span>
+              </button>
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
+              >
+                <Download className="w-5 h-5" />
+                <span>Export as Image</span>
+              </button>
+            </div>
           </div>
 
           {/* Main Content */}
