@@ -29,7 +29,7 @@ export const Toolbar = ({
   selectedShape,
   isSelectionMode,
   isTextMode,
-  showShapeDropdown,
+  showShapeDropdown = true,
   textStyle,
   shapeStyle,
   onShapeSelect,

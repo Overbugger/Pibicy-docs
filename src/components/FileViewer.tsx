@@ -1,7 +1,6 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { fabric } from "fabric";
 import {
-  Shapes,
   Circle,
   Square,
   Triangle,
@@ -10,149 +9,92 @@ import {
   Minus,
   MousePointer,
   Type,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Check,
-  Bold,
-  Italic,
-  Strikethrough,
-  Plus,
+  ArrowLeft,
+  Eye,
+  EyeOff,
 } from "lucide-react";
-
-// import UnsavedChangesDialog from "./UnsavedChangesDialog";
+import UnsavedChangesDialog from "./UnsavedChangesDialog";
 
 interface FileViewerProps {
   file: File;
 }
 
-type ShapeType =
-  | "line"
-  | "circle"
-  | "rectangle"
-  | "triangle"
-  | "ellipse"
-  | "text"
-  | null;
+type ShapeType = "line" | "rectangle" | "circle" | "triangle" | "ellipse" | "highlight" | "cover" | "text" | null;
 
 interface ShapeOption {
   type: ShapeType;
   icon: React.ReactNode;
   label: string;
+  color?: string;
 }
 
 const shapeOptions: ShapeOption[] = [
   { type: "line", icon: <Minus className="w-4 h-4" />, label: "Line" },
+  { type: "rectangle", icon: <Square className="w-4 h-4" />, label: "Rectangle" },
   { type: "circle", icon: <Circle className="w-4 h-4" />, label: "Circle" },
-  {
-    type: "rectangle",
-    icon: <Square className="w-4 h-4" />,
-    label: "Rectangle",
-  },
-  {
-    type: "triangle",
-    icon: <Triangle className="w-4 h-4" />,
-    label: "Triangle",
-  },
-  {
-    type: "ellipse",
-    icon: <CircleIcon className="w-4 h-4 transform scale-x-150" />,
-    label: "Ellipse",
-  },
+  { type: "triangle", icon: <Triangle className="w-4 h-4" />, label: "Triangle" },
+  { type: "ellipse", icon: <CircleIcon className="w-4 h-4 transform scale-x-150" />, label: "Ellipse" },
+  { type: "highlight", icon: <Eye className="w-4 h-4" />, label: "Highlight", color: "#ffeb3b" },
+  { type: "cover", icon: <EyeOff className="w-4 h-4" />, label: "Cover" },
 ];
 
 const fontSizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
-const fontFamilies = [
-  "Arial",
-  "Times New Roman",
-  "Courier New",
-  "Georgia",
-  "Verdana",
-];
-
-// Add proper type imports for fabric.js events
-interface IEvent<T extends Event = Event> {
-  e: T;
-  target?: fabric.Object;
-  subTargets?: fabric.Object[];
-  button?: number;
-  isClick?: boolean;
-  pointer?: fabric.Point;
-  transform?: { corner: string };
-}
-
-interface SelectionEvent extends IEvent {
-  target: fabric.Object;
-  selected?: fabric.Object[];
-  deselected?: fabric.Object[];
-}
-
-interface MouseEvent extends IEvent {
-  pointer: fabric.Point;
-  absolutePointer: fabric.Point;
-  button: number;
-  isClick: boolean;
-}
+const fontFamilies = ["Arial", "Times New Roman", "Courier New", "Georgia", "Verdana"];
 
 const FileViewer = ({ file }: FileViewerProps) => {
   const [imageUrl, setImageUrl] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
-  const [activeShape, setActiveShape] = useState<ShapeType>(null);
+  const [activeShape, setActiveShape] = useState<ShapeType>("rectangle");
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokeColor, setStrokeColor] = useState("#000000");
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [fillColor, setFillColor] = useState("transparent");
   const [showShapeDropdown, setShowShapeDropdown] = useState(true);
-  const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(
-    null
-  );
+  const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [isTextMode, setIsTextMode] = useState(false);
   const [fontSize, setFontSize] = useState(20);
   const [fontFamily, setFontFamily] = useState("Arial");
-  const [textAlign, setTextAlign] = useState<"left" | "center" | "right">(
-    "left"
-  );
   const [showTextControls, setShowTextControls] = useState(false);
   const [activeTextObj, setActiveTextObj] = useState<fabric.IText | null>(null);
-  const [isBold, setIsBold] = useState(false);
-  const [isItalic, setIsItalic] = useState(false);
-  const [isStrikethrough, setIsStrikethrough] = useState(false);
+  const [highlightColor, setHighlightColor] = useState("#ffeb3b");
+  const [highlightOpacity, setHighlightOpacity] = useState(0.3);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const [showModal, setShowModal] = useState(false);
-
-  const handleQuit = () => {
-    window.location.reload();
-  };
-
-  const handleDeleteSelected = useCallback(() => {
-    if (!canvas) return;
-    const activeObjects = canvas.getActiveObjects();
-    if (activeObjects.length > 0) {
-      activeObjects.forEach((obj) => {
-        if (obj !== canvas.backgroundImage) {
-          canvas.remove(obj);
-        }
-      });
-      canvas.discardActiveObject();
-      canvas.renderAll();
-    }
-  }, [canvas]);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     if (!canvasRef.current) return;
 
+    // Get the parent container dimensions
+    const container = canvasRef.current.parentElement;
+    if (!container) return;
+
+    // Set canvas size to match container with some padding
+    const containerWidth = Math.min(1200, window.innerWidth - 400); // max width 1200px, accounting for tools panel
+    const containerHeight = Math.min(800, window.innerHeight - 100); // max height 800px, with some margin
+
     const fabricCanvas = new fabric.Canvas(canvasRef.current, {
-      width: 800,
-      height: 600,
-      backgroundColor: "#f8fafc",
+      width: containerWidth,
+      height: containerHeight,
+      backgroundColor: "#ffffff",
       selection: true,
       preserveObjectStacking: true,
+      centeredScaling: true,
     });
+
+    // Add resize handler
+    const handleResize = () => {
+      const newWidth = Math.min(1200, window.innerWidth - 400);
+      const newHeight = Math.min(800, window.innerHeight - 100);
+      fabricCanvas.setDimensions({ width: newWidth, height: newHeight });
+      fabricCanvas.renderAll();
+    };
+
+    window.addEventListener('resize', handleResize);
 
     fabricCanvas.on("object:added", function (e) {
       if (e.target) {
@@ -167,36 +109,10 @@ const FileViewer = ({ file }: FileViewerProps) => {
     setCanvas(fabricCanvas);
 
     return () => {
+      window.removeEventListener('resize', handleResize);
       fabricCanvas.dispose();
     };
   }, []);
-
-  useEffect(() => {
-    if (!canvas) return;
-
-    canvas.getObjects().forEach((obj) => {
-      if (obj !== canvas.backgroundImage) {
-        obj.set({
-          selectable: isSelectionMode,
-          hasControls: isSelectionMode,
-          hasBorders: isSelectionMode,
-          lockMovementX: !isSelectionMode,
-          lockMovementY: !isSelectionMode,
-        });
-      }
-    });
-
-    canvas.selection = isSelectionMode;
-    canvas.defaultCursor = isSelectionMode ? "default" : "crosshair";
-    canvas.hoverCursor = isSelectionMode ? "move" : "crosshair";
-    canvas.interactive = isSelectionMode;
-
-    if (!isSelectionMode) {
-      canvas.discardActiveObject();
-    }
-
-    canvas.renderAll();
-  }, [canvas, isSelectionMode]);
 
   useEffect(() => {
     if (!canvas || !file) return;
@@ -217,29 +133,37 @@ const FileViewer = ({ file }: FileViewerProps) => {
 
       const canvasWidth = canvas.getWidth();
       const canvasHeight = canvas.getHeight();
-      const imgAspectRatio = img.width! / img.height!;
-      const canvasAspectRatio = canvasWidth / canvasHeight;
+      const imgWidth = img.width!;
+      const imgHeight = img.height!;
 
-      let scaleX, scaleY;
-      if (imgAspectRatio > canvasAspectRatio) {
-        scaleX = canvasWidth / img.width!;
-        scaleY = scaleX;
-      } else {
-        scaleY = canvasHeight / img.height!;
-        scaleX = scaleY;
-      }
+      // Calculate scaling to fit the image within the canvas while maintaining aspect ratio
+      const scaleX = (canvasWidth * 0.9) / imgWidth;
+      const scaleY = (canvasHeight * 0.9) / imgHeight;
+      const scale = Math.min(scaleX, scaleY);
 
+      // Center the image
       img.set({
-        scaleX: scaleX,
-        scaleY: scaleY,
-        originX: "center",
-        originY: "center",
+        scaleX: scale,
+        scaleY: scale,
+        originX: 'center',
+        originY: 'center',
         left: canvasWidth / 2,
         top: canvasHeight / 2,
         selectable: false,
+        crossOrigin: 'anonymous'
       });
 
-      canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+      canvas.setBackgroundImage(img, () => {
+        canvas.renderAll();
+        // Optionally zoom to fit if image is too small
+        if (scale < 0.5) {
+          canvas.setZoom(Math.min(0.9, 1 / scale));
+          canvas.renderAll();
+        }
+      });
+
+      // Reset the view
+      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     });
 
     return () => {
@@ -253,9 +177,13 @@ const FileViewer = ({ file }: FileViewerProps) => {
     if (!canvas) return null;
 
     const shapeProps = {
-      stroke: strokeColor,
+      stroke: activeShape === "highlight" ? "transparent" : strokeColor,
       strokeWidth: strokeWidth,
-      fill: fillColor,
+      fill: activeShape === "highlight" 
+        ? `${highlightColor}${Math.round(highlightOpacity * 255).toString(16).padStart(2, '0')}` 
+        : activeShape === "cover"
+        ? "#000000"
+        : fillColor,
       left: pointer.x,
       top: pointer.y,
       selectable: isSelectionMode,
@@ -271,16 +199,18 @@ const FileViewer = ({ file }: FileViewerProps) => {
           ...shapeProps,
           fill: strokeColor,
         });
-      case "circle":
-        return new fabric.Circle({
-          ...shapeProps,
-          radius: 0,
-        });
       case "rectangle":
+      case "highlight":
+      case "cover":
         return new fabric.Rect({
           ...shapeProps,
           width: 0,
           height: 0,
+        });
+      case "circle":
+        return new fabric.Circle({
+          ...shapeProps,
+          radius: 0,
         });
       case "triangle":
         return new fabric.Triangle({
@@ -308,13 +238,9 @@ const FileViewer = ({ file }: FileViewerProps) => {
       fill: strokeColor,
       fontSize: fontSize,
       fontFamily: fontFamily,
-      textAlign: textAlign,
       padding: 5,
       selectable: true,
       hasControls: true,
-      fontWeight: isBold ? "bold" : "normal",
-      fontStyle: isItalic ? "italic" : "normal",
-      underline: isStrikethrough,
     });
 
     textbox.on("editing:entered", () => {
@@ -332,14 +258,18 @@ const FileViewer = ({ file }: FileViewerProps) => {
     return textbox;
   };
 
-  const handleDoneEditing = () => {
-    if (!canvas || !activeTextObj) return;
-
-    activeTextObj.exitEditing();
-    canvas.renderAll();
-    setIsTextMode(false);
-    setShowTextControls(false);
-    setActiveTextObj(null);
+  const handleDeleteSelected = () => {
+    if (!canvas) return;
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length > 0) {
+      activeObjects.forEach((obj) => {
+        if (obj !== canvas.backgroundImage) {
+          canvas.remove(obj);
+        }
+      });
+      canvas.discardActiveObject();
+      canvas.renderAll();
+    }
   };
 
   useEffect(() => {
@@ -390,21 +320,23 @@ const FileViewer = ({ file }: FileViewerProps) => {
             y2: pointer.y,
           });
           break;
-        case "circle":
-          {
-            const radius = Math.sqrt(
-              Math.pow(pointer.x - startPointRef.current.x, 2) +
-                Math.pow(pointer.y - startPointRef.current.y, 2)
-            );
-            (activeObject as fabric.Circle).set({ radius });
-          }
-          break;
         case "rectangle":
+        case "highlight":
+        case "cover":
         case "triangle":
           activeObject.set({
             width: Math.abs(pointer.x - startPointRef.current.x),
             height: Math.abs(pointer.y - startPointRef.current.y),
           });
+          break;
+        case "circle":
+          {
+            const radius = Math.sqrt(
+              Math.pow(pointer.x - startPointRef.current.x, 2) +
+              Math.pow(pointer.y - startPointRef.current.y, 2)
+            );
+            (activeObject as fabric.Circle).set({ radius });
+          }
           break;
         case "ellipse":
           (activeObject as fabric.Ellipse).set({
@@ -421,10 +353,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
       if (!canvas) return;
       setIsDrawing(false);
       startPointRef.current = null;
-      const objects = canvas.getObjects();
-      if (objects.length > 0) {
-        canvas.setActiveObject(objects[objects.length - 1]);
-      }
       canvas.renderAll();
     };
 
@@ -437,24 +365,16 @@ const FileViewer = ({ file }: FileViewerProps) => {
       canvas.off("mouse:move", handleMouseMove);
       canvas.off("mouse:up", handleMouseUp);
     };
-  }, [
-    canvas,
-    activeShape,
-    isDrawing,
-    isTextMode,
-    activeTextObj,
-    isSelectionMode,
-  ]);
+  }, [canvas, activeShape, isDrawing, isTextMode, activeTextObj, isSelectionMode]);
 
   useEffect(() => {
     if (!canvas) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Delete" || e.key === "Backspace") {
-        // Check if we're currently editing a text object
         const activeObj = canvas.getActiveObject();
         if (activeObj instanceof fabric.IText && activeObj.isEditing) {
-          return; // Don't delete the object if we're editing text
+          return;
         }
         handleDeleteSelected();
       }
@@ -464,7 +384,7 @@ const FileViewer = ({ file }: FileViewerProps) => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [canvas, handleDeleteSelected]);
+  }, [canvas]);
 
   const handleClearCanvas = () => {
     if (!canvas) return;
@@ -528,395 +448,284 @@ const FileViewer = ({ file }: FileViewerProps) => {
   }, []);
 
   useEffect(() => {
-    if (!activeTextObj || !canvas) return;
-
-    const updateSelectedTextStyle = () => {
-      const selectionStart = activeTextObj.selectionStart;
-      const selectionEnd = activeTextObj.selectionEnd;
-
-      if (
-        typeof selectionStart === "number" &&
-        typeof selectionEnd === "number" &&
-        selectionStart !== selectionEnd
-      ) {
-        // Apply styles only to selected text
-        activeTextObj.setSelectionStyles(
-          {
-            fontWeight: isBold ? "bold" : "normal",
-            fontStyle: isItalic ? "italic" : "normal",
-            underline: isStrikethrough,
-            fontSize: fontSize,
-            fontFamily: fontFamily,
-            fill: strokeColor,
-          },
-          selectionStart,
-          selectionEnd
-        );
-      } else {
-        // If no selection, set the style for the next input
-        activeTextObj.setSelectionStyles({
-          fontWeight: isBold ? "bold" : "normal",
-          fontStyle: isItalic ? "italic" : "normal",
-          underline: isStrikethrough,
-          fontSize: fontSize,
-          fontFamily: fontFamily,
-          fill: strokeColor,
-        });
-      }
-      canvas.renderAll();
-    };
-
-    updateSelectedTextStyle();
-  }, [
-    isBold,
-    isItalic,
-    isStrikethrough,
-    fontSize,
-    fontFamily,
-    strokeColor,
-    activeTextObj,
-    canvas,
-  ]);
-
-  useEffect(() => {
     if (!canvas) return;
 
-    const handleTextSelected = (e: fabric.IEvent<Event>) => {
-      const target = e.target;
-      if (target && target instanceof fabric.IText) {
-        setActiveTextObj(target);
-        setIsTextMode(true);
-        setShowTextControls(true);
+    const handleObjectAdded = () => setHasUnsavedChanges(true);
+    const handleObjectRemoved = () => setHasUnsavedChanges(true);
+    const handleObjectModified = () => setHasUnsavedChanges(true);
 
-        // Get styles of selected text
-        const selectionStart = target.selectionStart;
-        const selectionEnd = target.selectionEnd;
-
-        if (
-          typeof selectionStart === "number" &&
-          typeof selectionEnd === "number" &&
-          selectionStart !== selectionEnd
-        ) {
-          const selectedStyles = target.getSelectionStyles(
-            selectionStart,
-            selectionEnd
-          );
-          if (selectedStyles.length > 0) {
-            const firstStyle = selectedStyles[0];
-            setIsBold(firstStyle.fontWeight === "bold");
-            setIsItalic(firstStyle.fontStyle === "italic");
-            setIsStrikethrough(!!firstStyle.underline);
-            if (firstStyle.fontSize) setFontSize(firstStyle.fontSize as number);
-            if (firstStyle.fontFamily)
-              setFontFamily(firstStyle.fontFamily as string);
-            if (firstStyle.fill) setStrokeColor(firstStyle.fill as string);
-          }
-        }
-      }
-    };
-
-    const handleSelectionChanged = (e: fabric.IEvent<Event>) => {
-      const target = e.target;
-      if (target && target instanceof fabric.IText && target.isEditing) {
-        const selectionStart = target.selectionStart;
-        const selectionEnd = target.selectionEnd;
-
-        if (
-          typeof selectionStart === "number" &&
-          typeof selectionEnd === "number" &&
-          selectionStart !== selectionEnd
-        ) {
-          const selectedStyles = target.getSelectionStyles(
-            selectionStart,
-            selectionEnd
-          );
-          if (selectedStyles.length > 0) {
-            const firstStyle = selectedStyles[0];
-            setIsBold(firstStyle.fontWeight === "bold");
-            setIsItalic(firstStyle.fontStyle === "italic");
-            setIsStrikethrough(!!firstStyle.underline);
-            if (firstStyle.fontSize) setFontSize(firstStyle.fontSize as number);
-            if (firstStyle.fontFamily)
-              setFontFamily(firstStyle.fontFamily as string);
-            if (firstStyle.fill) setStrokeColor(firstStyle.fill as string);
-          }
-        }
-      }
-    };
-
-    canvas.on("selection:created", handleTextSelected);
-    canvas.on("selection:updated", handleTextSelected);
-    canvas.on("text:selection:changed", handleSelectionChanged);
-    canvas.on("selection:cleared", () => {
-      if (!isTextMode) {
-        setActiveTextObj(null);
-        setShowTextControls(false);
-      }
-    });
+    canvas.on('object:added', handleObjectAdded);
+    canvas.on('object:removed', handleObjectRemoved);
+    canvas.on('object:modified', handleObjectModified);
 
     return () => {
-      canvas.off("selection:created", handleTextSelected);
-      canvas.off("selection:updated", handleTextSelected);
-      canvas.off("text:selection:changed", handleSelectionChanged);
+      canvas.off('object:added', handleObjectAdded);
+      canvas.off('object:removed', handleObjectRemoved);
+      canvas.off('object:modified', handleObjectModified);
     };
   }, [canvas]);
 
-  useEffect(() => {
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedDialog(true);
+    } else {
+      // Navigate back to file upload
+      window.location.reload();
+    }
+  };
+
+  const handleDownload = () => {
     if (!canvas) return;
 
-    const handleObjectAdded = (e: fabric.IEvent) => {
-      const obj = e.target;
-      if (obj && obj !== canvas.backgroundImage) {
-        obj.set({
-          selectable: isSelectionMode,
-          hasControls: isSelectionMode,
-          hasBorders: isSelectionMode,
-          lockMovementX: !isSelectionMode,
-          lockMovementY: !isSelectionMode,
-        });
-      }
-    };
+    // Create a temporary canvas for the final image
+    const tempCanvas = document.createElement('canvas');
+    const context = tempCanvas.getContext('2d');
+    if (!context) return;
 
-    canvas.on("object:added", handleObjectAdded);
+    // Set the canvas dimensions
+    tempCanvas.width = canvas.getWidth();
+    tempCanvas.height = canvas.getHeight();
 
-    return () => {
-      canvas.off("object:added", handleObjectAdded);
-    };
-  }, [canvas, isSelectionMode]);
+    // Draw the background color
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // Get the canvas data URL
+    const dataUrl = canvas.toDataURL({
+      format: 'png',
+      quality: 1,
+      multiplier: 1
+    });
+
+    // Create a download link
+    const link = document.createElement('a');
+    link.download = `edited_${file.name.split('.')[0]}.png`;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setHasUnsavedChanges(false);
+    setShowUnsavedDialog(false);
+  };
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 min-h-screen">
       {error && <div className="text-red-500 mb-4">{error}</div>}
       {!error && (
-        <div className="flex gap-6">
-          {/* Canvas Section */}
-          <div className="flex-shrink-0">
-            <div className="sticky top-4 space-y-4">
-              <div className="flex justify-between items-center mb-4">
-                <button
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex gap-1 items-center"
-                  onClick={() => setShowModal(true)}
-                >
-                  <Plus className="w-5 h-5" />
-                  Add New
-                </button>
-              </div>
-              <div className="border border-gray-200 rounded-xl overflow-hidden shadow-lg bg-white">
-                <canvas ref={canvasRef} className="block" />
-              </div>
-            </div>
+        <div className="flex flex-col h-full">
+          {/* Back Button */}
+          <div className="mb-4">
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back to Upload</span>
+            </button>
           </div>
 
-          <div className="flex-1 max-w-md">
-            <div className="sticky top-4 space-y-4">
-              {/* Main Tools */}
-              <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
-                  Tools
-                </h3>
-                {/* Tool Selection Buttons */}
-                <div className="flex gap-2 mb-4">
-                  <button
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                      isSelectionMode
-                        ? "bg-blue-500 text-white shadow-md"
-                        : "bg-gray-50 hover:bg-gray-100 text-gray-700"
-                    }`}
-                    onClick={() => {
-                      setIsSelectionMode(true);
-                      setActiveShape(null);
-                      setShowShapeDropdown(false);
-                      setIsTextMode(false);
-                      setShowTextControls(false);
-                    }}
-                  >
-                    <MousePointer className="w-5 h-5" />
-                    <span className="font-medium">Select</span>
-                  </button>
-
-                  <button
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                      activeShape || showShapeDropdown
-                        ? "bg-blue-500 text-white shadow-md"
-                        : "bg-gray-50 hover:bg-gray-100 text-gray-700"
-                    }`}
-                    onClick={() => {
-                      setShowShapeDropdown(!showShapeDropdown);
-                      setIsSelectionMode(false);
-                      setIsTextMode(false);
-                      setShowTextControls(false);
-                    }}
-                  >
-                    <Shapes className="w-5 h-5" />
-                    <span className="font-medium">Shapes</span>
-                  </button>
-
-                  <button
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                      isTextMode
-                        ? "bg-blue-500 text-white shadow-md"
-                        : "bg-gray-50 hover:bg-gray-100 text-gray-700"
-                    }`}
-                    onClick={() => {
-                      setIsTextMode(!isTextMode);
-                      setIsSelectionMode(false);
-                      setActiveShape(null);
-                      setShowShapeDropdown(false);
-                      setShowTextControls(!isTextMode);
-                    }}
-                  >
-                    <Type className="w-5 h-5" />
-                    <span className="font-medium">Text</span>
-                  </button>
+          <div className="flex gap-6 h-full">
+            {/* Canvas Section */}
+            <div className="flex-shrink-0 flex-grow overflow-hidden">
+              <div className="sticky top-4">
+                <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                  <div className="relative canvas-container bg-[#f8fafc] p-6 min-h-[600px] flex items-center justify-center">
+                    <canvas ref={canvasRef} className="max-w-full h-auto shadow-sm" />
+                  </div>
                 </div>
+              </div>
+            </div>
 
-                {/* Dynamic Tool Content */}
-                <div className="space-y-4">
-                  {/* Shape Tools */}
-                  {showShapeDropdown && (
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-gray-600">
-                        Shape Options
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {shapeOptions.map(({ type, icon, label }) => (
-                          <button
-                            key={type}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-                              activeShape === type
-                                ? "bg-blue-50 text-blue-600"
-                                : "hover:bg-gray-50 text-gray-700"
-                            }`}
-                            onClick={() => {
-                              setActiveShape(
-                                activeShape === type ? null : type
-                              );
-                              setIsSelectionMode(false);
-                            }}
-                          >
-                            {icon}
-                            <span className="text-sm">{label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            <div className="flex-1 max-w-md">
+              <div className="sticky top-4 space-y-4">
+                {/* Main Tools */}
+                <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Tools
+                  </h3>
+                  {/* Tool Selection Buttons */}
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                        isSelectionMode
+                          ? "bg-blue-500 text-white shadow-md"
+                          : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+                      }`}
+                      onClick={() => {
+                        setIsSelectionMode(true);
+                        setActiveShape(null);
+                        setShowShapeDropdown(false);
+                        setIsTextMode(false);
+                        setShowTextControls(false);
+                      }}
+                    >
+                      <MousePointer className="w-5 h-5" />
+                      <span className="font-medium">Select</span>
+                    </button>
 
-                  {/* Text Tools */}
-                  {isTextMode && (
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-gray-600">
-                        Text Options
-                      </h4>
-                      <div className="grid gap-3">
-                        <div className="flex gap-2">
-                          <select
-                            value={fontFamily}
-                            onChange={(e) => setFontFamily(e.target.value)}
-                            className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200"
-                          >
-                            {fontFamilies.map((font) => (
-                              <option key={font} value={font}>
-                                {font}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            value={fontSize}
-                            onChange={(e) =>
-                              setFontSize(Number(e.target.value))
-                            }
-                            className="w-24 px-3 py-1.5 rounded-lg border border-gray-200"
-                          >
-                            {fontSizes.map((size) => (
-                              <option key={size} value={size}>
-                                {size}px
-                              </option>
-                            ))}
-                          </select>
+                    <button
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                        activeShape || showShapeDropdown
+                          ? "bg-blue-500 text-white shadow-md"
+                          : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+                      }`}
+                      onClick={() => {
+                        setShowShapeDropdown(!showShapeDropdown);
+                        setIsSelectionMode(false);
+                        setIsTextMode(false);
+                        setShowTextControls(false);
+                      }}
+                    >
+                      <Square className="w-5 h-5" />
+                      <span className="font-medium">Draw</span>
+                    </button>
+
+                    <button
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                        isTextMode
+                          ? "bg-blue-500 text-white shadow-md"
+                          : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+                      }`}
+                      onClick={() => {
+                        setIsTextMode(!isTextMode);
+                        setIsSelectionMode(false);
+                        setActiveShape(null);
+                        setShowShapeDropdown(false);
+                        setShowTextControls(!isTextMode);
+                      }}
+                    >
+                      <Type className="w-5 h-5" />
+                      <span className="font-medium">Text</span>
+                    </button>
+                  </div>
+
+                  {/* Dynamic Tool Content */}
+                  <div className="space-y-4">
+                    {/* Shape Tools */}
+                    {showShapeDropdown && (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-gray-600">
+                          Drawing Tools
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {shapeOptions.map(({ type, icon, label }) => (
+                            <button
+                              key={type}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                                activeShape === type
+                                  ? "bg-blue-50 text-blue-600"
+                                  : "hover:bg-gray-50 text-gray-700"
+                              }`}
+                              onClick={() => {
+                                setActiveShape(
+                                  activeShape === type ? null : type
+                                );
+                                setIsSelectionMode(false);
+                              }}
+                            >
+                              {icon}
+                              <span className="text-sm">{label}</span>
+                            </button>
+                          ))}
                         </div>
 
-                        <div className="flex items-center gap-1 p-1 border border-gray-200 rounded-lg">
-                          <button
-                            className={`p-1 ${isBold ? "bg-gray-200" : ""}`}
-                            onClick={() => {
-                              setIsBold(!isBold);
-                              if (activeTextObj) {
-                                activeTextObj.set(
-                                  "fontWeight",
-                                  !isBold ? "bold" : "normal"
-                                );
-                                canvas?.renderAll();
+                        {/* Highlight Controls */}
+                        {activeShape === "highlight" && (
+                          <div className="space-y-3 pt-3 border-t border-gray-200">
+                            <h4 className="text-sm font-medium text-gray-600">
+                              Highlight Options
+                            </h4>
+                            <div className="space-y-4">
+                              <div>
+                                <label className="text-sm font-medium text-gray-600 block mb-2">
+                                  Color
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <div className="relative">
+                                    <input
+                                      type="color"
+                                      value={highlightColor}
+                                      onChange={(e) => setHighlightColor(e.target.value)}
+                                      className="w-10 h-10 cursor-pointer opacity-0 absolute"
+                                    />
+                                    <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
+                                      <div
+                                        className="w-8 h-8 rounded"
+                                        style={{ backgroundColor: highlightColor }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex-1">
+                                    <select
+                                      value={highlightColor}
+                                      onChange={(e) => setHighlightColor(e.target.value)}
+                                      className="w-full px-3 py-1.5 rounded-lg border border-gray-200"
+                                    >
+                                      <option value="#ffeb3b">Yellow</option>
+                                      <option value="#4caf50">Green</option>
+                                      <option value="#2196f3">Blue</option>
+                                      <option value="#f44336">Red</option>
+                                      <option value="#9c27b0">Purple</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium text-gray-600 block mb-2">
+                                  Opacity: {Math.round(highlightOpacity * 100)}%
+                                </label>
+                                <input
+                                  type="range"
+                                  min="10"
+                                  max="80"
+                                  value={highlightOpacity * 100}
+                                  onChange={(e) => setHighlightOpacity(Number(e.target.value) / 100)}
+                                  className="w-full"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Text Tools */}
+                    {isTextMode && (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-gray-600">
+                          Text Options
+                        </h4>
+                        <div className="grid gap-3">
+                          <div className="flex gap-2">
+                            <select
+                              value={fontFamily}
+                              onChange={(e) => setFontFamily(e.target.value)}
+                              className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200"
+                            >
+                              {fontFamilies.map((font) => (
+                                <option key={font} value={font}>
+                                  {font}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={fontSize}
+                              onChange={(e) =>
+                                setFontSize(Number(e.target.value))
                               }
-                            }}
-                            title="Bold"
-                          >
-                            <Bold className="w-4 h-4" />
-                          </button>
-                          <button
-                            className={`p-1 ${isItalic ? "bg-gray-200" : ""}`}
-                            onClick={() => {
-                              setIsItalic(!isItalic);
-                              if (activeTextObj) {
-                                activeTextObj.set(
-                                  "fontStyle",
-                                  !isItalic ? "italic" : "normal"
-                                );
-                                canvas?.renderAll();
-                              }
-                            }}
-                            title="Italic"
-                          >
-                            <Italic className="w-4 h-4" />
-                          </button>
-                          <button
-                            className={`p-1 ${
-                              isStrikethrough ? "bg-gray-200" : ""
-                            }`}
-                            onClick={() => {
-                              setIsStrikethrough(!isStrikethrough);
-                              if (activeTextObj) {
-                                activeTextObj.set(
-                                  "underline",
-                                  !isStrikethrough
-                                );
-                                canvas?.renderAll();
-                              }
-                            }}
-                            title="Strikethrough"
-                          >
-                            <Strikethrough className="w-4 h-4" />
-                          </button>
-                          <div className="w-px h-4 bg-gray-300 mx-1" />
-                          <button
-                            className={`p-1 ${
-                              textAlign === "left" ? "bg-gray-200" : ""
-                            }`}
-                            onClick={() => setTextAlign("left")}
-                          >
-                            <AlignLeft className="w-4 h-4" />
-                          </button>
-                          <button
-                            className={`p-1 ${
-                              textAlign === "center" ? "bg-gray-200" : ""
-                            }`}
-                            onClick={() => setTextAlign("center")}
-                          >
-                            <AlignCenter className="w-4 h-4" />
-                          </button>
-                          <button
-                            className={`p-1 ${
-                              textAlign === "right" ? "bg-gray-200" : ""
-                            }`}
-                            onClick={() => setTextAlign("right")}
-                          >
-                            <AlignRight className="w-4 h-4" />
-                          </button>
-                          {/* ... existing text formatting buttons ... */}
+                              className="w-24 px-3 py-1.5 rounded-lg border border-gray-200"
+                            >
+                              {fontSizes.map((size) => (
+                                <option key={size} value={size}>
+                                  {size}px
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
                           <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium">
-                              Color:
-                            </label>
+                            <label className="text-sm font-medium">Color:</label>
                             <div className="relative">
                               <input
                                 type="color"
@@ -932,154 +741,99 @@ const FileViewer = ({ file }: FileViewerProps) => {
                               </div>
                             </div>
                           </div>
-
-                          <button
-                            className="ml-auto flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                            onClick={handleDoneEditing}
-                          >
-                            <Check className="w-4 h-4" />
-                            <span>Done</span>
-                          </button>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {selectedObject && !isTextMode && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-3 pt-3 border-t border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-600">
-                          Style
-                        </h4>
-                        <div className="grid grid-cols-2 gap-4">
+                    {/* Object Properties */}
+                    {selectedObject && !isTextMode && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-3 pt-3 border-t border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-600">
+                            Properties
+                          </h4>
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-600">
-                              Stroke Color
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <div className="relative">
+                            {activeShape !== "highlight" && activeShape !== "cover" && (
+                              <>
+                                <label className="text-sm font-medium text-gray-600">
+                                  Color
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <div className="relative">
+                                    <input
+                                      type="color"
+                                      value={strokeColor}
+                                      onChange={(e) => {
+                                        setStrokeColor(e.target.value);
+                                        updateSelectedObject();
+                                      }}
+                                      className="w-10 h-10 cursor-pointer opacity-0 absolute"
+                                    />
+                                    <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
+                                      <div
+                                        className="w-8 h-8 rounded"
+                                        style={{ backgroundColor: strokeColor }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-gray-600">
+                                Width
+                              </label>
+                              <div className="flex items-center gap-4">
                                 <input
-                                  type="color"
-                                  value={strokeColor}
+                                  type="range"
+                                  min="1"
+                                  max="20"
+                                  value={strokeWidth}
                                   onChange={(e) => {
-                                    setStrokeColor(e.target.value);
+                                    setStrokeWidth(Number(e.target.value));
                                     updateSelectedObject();
                                   }}
-                                  className="w-10 h-10 cursor-pointer opacity-0 absolute"
+                                  className="flex-1"
                                 />
-                                <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
-                                  <div
-                                    className="w-8 h-8 rounded"
-                                    style={{ backgroundColor: strokeColor }}
-                                  />
-                                </div>
+                                <span className="text-sm font-medium text-gray-600 w-12">
+                                  {strokeWidth}px
+                                </span>
                               </div>
                             </div>
                           </div>
-
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-600">
-                              Fill Color
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <div className="relative">
-                                <input
-                                  type="color"
-                                  value={
-                                    fillColor === "transparent"
-                                      ? "#ffffff"
-                                      : fillColor
-                                  }
-                                  onChange={(e) => {
-                                    setFillColor(e.target.value);
-                                    updateSelectedObject();
-                                  }}
-                                  className="w-10 h-10 cursor-pointer opacity-0 absolute"
-                                />
-                                <div className="w-10 h-10 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
-                                  <div
-                                    className="w-8 h-8 rounded"
-                                    style={{
-                                      backgroundColor: fillColor,
-                                      backgroundImage:
-                                        fillColor === "transparent"
-                                          ? "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)"
-                                          : undefined,
-                                      backgroundSize: "8px 8px",
-                                      backgroundPosition:
-                                        "0 0, 0 4px, 4px -4px, -4px 0px",
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                              <button
-                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                                  fillColor === "transparent"
-                                    ? "bg-blue-500 text-white shadow-sm"
-                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                }`}
-                                onClick={() => {
-                                  setFillColor(
-                                    fillColor === "transparent"
-                                      ? "#ffffff"
-                                      : "transparent"
-                                  );
-                                  updateSelectedObject();
-                                }}
-                              >
-                                Transparent
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-600">
-                            Stroke Width
-                          </label>
-                          <div className="flex items-center gap-4">
-                            <input
-                              type="range"
-                              min="1"
-                              max="20"
-                              value={strokeWidth}
-                              onChange={(e) => {
-                                setStrokeWidth(Number(e.target.value));
-                                updateSelectedObject();
-                              }}
-                              className="flex-1"
-                            />
-                            <span className="text-sm font-medium text-gray-600 w-12">
-                              {strokeWidth}px
-                            </span>
-                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Clear Canvas Button - Always visible */}
-                  <div className="pt-3 border-t border-gray-200">
-                    <button
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all"
-                      onClick={handleClearCanvas}
-                      disabled={
-                        !canvas || (canvas && canvas.getObjects().length <= 1)
-                      }
-                    >
-                      <Trash2 className="w-5 h-5" />
-                      <span className="font-medium">Clear all</span>
-                    </button>
+                    {/* Clear Canvas Button */}
+                    <div className="pt-3 border-t border-gray-200">
+                      <button
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all"
+                        onClick={handleClearCanvas}
+                        disabled={
+                          !canvas || (canvas && canvas.getObjects().length <= 1)
+                        }
+                      >
+                        <Trash2 className="w-5 h-5" />
+                        <span className="font-medium">Clear all</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          {/* <UnsavedChangesDialog
-            isOpen={showModal}
-            onClose={() => setShowModal(false)}
-            onQuit={handleQuit}
-          /> */}
+
+          <UnsavedChangesDialog
+            isOpen={showUnsavedDialog}
+            onClose={() => setShowUnsavedDialog(false)}
+            onBack={() => {
+              setShowUnsavedDialog(false);
+              window.location.reload();
+            }}
+            onDownload={handleDownload}
+          />
         </div>
       )}
     </div>
