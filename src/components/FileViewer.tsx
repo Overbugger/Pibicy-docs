@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  Plus,
 } from "lucide-react";
 import UnsavedChangesDialog from "./UnsavedChangesDialog";
 
@@ -73,13 +74,17 @@ const FileViewer = ({ file }: FileViewerProps) => {
     const container = canvasRef.current.parentElement;
     if (!container) return;
 
-    // Set canvas size to match container with some padding
-    const containerWidth = Math.min(1200, window.innerWidth - 400); // max width 1200px, accounting for tools panel
-    const containerHeight = Math.min(800, window.innerHeight - 100); // max height 800px, with some margin
+    // Calculate canvas size based on viewport
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Set canvas size accounting for padding and tools panel
+    const canvasWidth = Math.min(viewportWidth - 400, 1200); // Max width 1200px
+    const canvasHeight = Math.min(viewportHeight - 200, 800); // Max height 800px
 
     const fabricCanvas = new fabric.Canvas(canvasRef.current, {
-      width: containerWidth,
-      height: containerHeight,
+      width: canvasWidth,
+      height: canvasHeight,
       backgroundColor: "#ffffff",
       selection: true,
       preserveObjectStacking: true,
@@ -88,8 +93,8 @@ const FileViewer = ({ file }: FileViewerProps) => {
 
     // Add resize handler
     const handleResize = () => {
-      const newWidth = Math.min(1200, window.innerWidth - 400);
-      const newHeight = Math.min(800, window.innerHeight - 100);
+      const newWidth = Math.min(window.innerWidth - 400, 1200);
+      const newHeight = Math.min(window.innerHeight - 200, 800);
       fabricCanvas.setDimensions({ width: newWidth, height: newHeight });
       fabricCanvas.renderAll();
     };
@@ -474,6 +479,14 @@ const FileViewer = ({ file }: FileViewerProps) => {
     }
   };
 
+  const handleAddNew = () => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedDialog(true);
+    } else {
+      window.location.reload();
+    }
+  };
+
   const handleDownload = () => {
     if (!canvas) return;
 
@@ -510,34 +523,44 @@ const FileViewer = ({ file }: FileViewerProps) => {
   };
 
   return (
-    <div className="mt-4 min-h-screen">
-      {error && <div className="text-red-500 mb-4">{error}</div>}
+    <div className="min-h-screen bg-gray-100">
+      {error && (
+        <div className="max-w-2xl mx-auto p-4 bg-red-50 text-red-600 rounded-lg mt-4">
+          {error}
+        </div>
+      )}
       {!error && (
-        <div className="flex flex-col h-full">
-          {/* Back Button */}
-          <div className="mb-4">
+        <div className="flex flex-col h-full max-w-[1800px] mx-auto px-6">
+          {/* Header */}
+          <div className="py-4 flex justify-between items-center">
             <button
               onClick={handleBack}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors rounded-lg hover:bg-white"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span>Back to Upload</span>
+              <span>Back</span>
+            </button>
+
+            <button
+              onClick={handleAddNew}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Add New</span>
             </button>
           </div>
 
-          <div className="flex gap-6 h-full">
+          {/* Main Content */}
+          <div className="flex gap-6 h-[calc(100vh-120px)]">
             {/* Canvas Section */}
-            <div className="flex-shrink-0 flex-grow overflow-hidden">
-              <div className="sticky top-4">
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                  <div className="relative canvas-container bg-[#f8fafc] p-6 min-h-[600px] flex items-center justify-center">
-                    <canvas ref={canvasRef} className="max-w-full h-auto shadow-sm" />
-                  </div>
-                </div>
+            <div className="flex-1 bg-white rounded-xl shadow-lg overflow-hidden">
+              <div className="relative w-full h-full flex items-center justify-center bg-[#f8fafc] p-4">
+                <canvas ref={canvasRef} className="max-w-full max-h-full" />
               </div>
             </div>
 
-            <div className="flex-1 max-w-md">
+            {/* Tools Panel */}
+            <div className="w-80 flex-shrink-0">
               <div className="sticky top-4 space-y-4">
                 {/* Main Tools */}
                 <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
@@ -545,11 +568,11 @@ const FileViewer = ({ file }: FileViewerProps) => {
                     Tools
                   </h3>
                   {/* Tool Selection Buttons */}
-                  <div className="flex gap-2 mb-4">
+                  <div className="grid grid-cols-3 gap-2 mb-4">
                     <button
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                      className={`flex flex-col items-center justify-center gap-1 p-3 rounded-lg transition-all ${
                         isSelectionMode
-                          ? "bg-blue-500 text-white shadow-md"
+                          ? "bg-blue-500 text-white shadow-sm"
                           : "bg-gray-50 hover:bg-gray-100 text-gray-700"
                       }`}
                       onClick={() => {
@@ -561,13 +584,13 @@ const FileViewer = ({ file }: FileViewerProps) => {
                       }}
                     >
                       <MousePointer className="w-5 h-5" />
-                      <span className="font-medium">Select</span>
+                      <span className="text-xs font-medium">Select</span>
                     </button>
 
                     <button
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                      className={`flex flex-col items-center justify-center gap-1 p-3 rounded-lg transition-all ${
                         activeShape || showShapeDropdown
-                          ? "bg-blue-500 text-white shadow-md"
+                          ? "bg-blue-500 text-white shadow-sm"
                           : "bg-gray-50 hover:bg-gray-100 text-gray-700"
                       }`}
                       onClick={() => {
@@ -578,13 +601,13 @@ const FileViewer = ({ file }: FileViewerProps) => {
                       }}
                     >
                       <Square className="w-5 h-5" />
-                      <span className="font-medium">Draw</span>
+                      <span className="text-xs font-medium">Draw</span>
                     </button>
 
                     <button
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                      className={`flex flex-col items-center justify-center gap-1 p-3 rounded-lg transition-all ${
                         isTextMode
-                          ? "bg-blue-500 text-white shadow-md"
+                          ? "bg-blue-500 text-white shadow-sm"
                           : "bg-gray-50 hover:bg-gray-100 text-gray-700"
                       }`}
                       onClick={() => {
@@ -596,7 +619,7 @@ const FileViewer = ({ file }: FileViewerProps) => {
                       }}
                     >
                       <Type className="w-5 h-5" />
-                      <span className="font-medium">Text</span>
+                      <span className="text-xs font-medium">Text</span>
                     </button>
                   </div>
 

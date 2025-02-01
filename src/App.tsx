@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileEditor } from './components/features/file-editor/FileEditor';
+import FileViewer from './components/FileViewer';
 import { FileUpload } from './components/FileUpload';
 
 export const App = () => {
@@ -13,7 +13,7 @@ export const App = () => {
         {!selectedFile ? (
           <FileUpload onFileSelect={setSelectedFile} />
         ) : (
-          <FileEditor file={selectedFile} />
+          <FileViewer file={selectedFile} />
         )}
       </div>
     </div>
