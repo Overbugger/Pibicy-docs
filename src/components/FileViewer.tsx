@@ -14,8 +14,6 @@ import {
   EyeOff,
   Download,
   Save,
-  ChevronUp,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -131,7 +129,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
   const [isTextMode, setIsTextMode] = useState(false);
   const [fontSize, setFontSize] = useState(20);
   const [fontFamily, setFontFamily] = useState("Arial");
-  const [showTextControls, setShowTextControls] = useState(false);
   const [activeTextObj, setActiveTextObj] = useState<fabric.IText | null>(null);
   const [highlightColor, setHighlightColor] = useState("#ffeb3b");
   const [highlightOpacity, setHighlightOpacity] = useState(0.3);
@@ -327,7 +324,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
 
     textbox.on("editing:entered", () => {
       setIsTextMode(true);
-      setShowTextControls(true);
       setActiveTextObj(textbox);
     });
 
@@ -550,15 +546,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
   const handleBack = () => {
     if (hasUnsavedChanges) {
       setShowUnsavedDialog(true);
-      } else {
-      // Navigate back to file upload
-      window.location.reload();
-    }
-  };
-
-  const handleAddNew = () => {
-    if (hasUnsavedChanges) {
-      setShowUnsavedDialog(true);
     } else {
       window.location.reload();
     }
@@ -741,7 +728,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
                       setActiveShape(null);
                       setShowShapeDropdown(false);
                       setIsTextMode(false);
-                      setShowTextControls(false);
                     }}
                   >
                     <MousePointer className="w-5 h-5" />
@@ -758,7 +744,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
                       setShowShapeDropdown(!showShapeDropdown);
                       setIsSelectionMode(false);
                       setIsTextMode(false);
-                      setShowTextControls(false);
                     }}
                   >
                       <Square className="w-5 h-5" />
@@ -776,7 +761,6 @@ const FileViewer = ({ file }: FileViewerProps) => {
                       setIsSelectionMode(false);
                       setActiveShape(null);
                       setShowShapeDropdown(false);
-                      setShowTextControls(!isTextMode);
                     }}
                   >
                     <Type className="w-5 h-5" />
