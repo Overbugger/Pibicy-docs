@@ -12,7 +12,7 @@ export default defineConfig({
       ]
     }
   })],
-  base: "/",
+  base: "",
   optimizeDeps: {
     include: ["fabric", "react", "react-dom", "lucide-react"],
     force: true
