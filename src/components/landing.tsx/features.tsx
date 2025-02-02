@@ -1,6 +1,6 @@
 "use client"
 
-import { FileText, PenTool, Type, Highlighter, Share2, History } from "lucide-react"
+import { FileText, PenTool, Type, Highlighter } from "lucide-react"
 import { motion } from "framer-motion"
 
 export function Features() {
@@ -25,16 +25,6 @@ export function Features() {
       title: "Highlighting",
       description: "Highlight important sections with custom colors",
     },
-    // {
-    //   icon: Share2,
-    //   title: "Easy Sharing",
-    //   description: "Share annotated documents with your team",
-    // },
-    // {
-    //   icon: History,
-    //   title: "Version History",
-    //   description: "Track changes and revert when needed",
-    // },
   ]
 
   const container = {

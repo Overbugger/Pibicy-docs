@@ -27,7 +27,7 @@ export function AnimatedBackground() {
           repeat: Number.POSITIVE_INFINITY,
           ease: "linear",
         }}
-        className="absolute right-1/3 top-1/4 h-[500px] w-[500px] rounded-full bg-purple-500/10 blur-[100px]"
+        className="absolute right-1/3 top-1/4 h-[500px] w-[500px] rounded-full bg-blue-500/10 blur-[100px]"
       />
       <motion.div
         animate={{
