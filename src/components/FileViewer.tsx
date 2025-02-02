@@ -12,9 +12,12 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
-  Plus,
   Download,
   Save,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import UnsavedChangesDialog from "./UnsavedChangesDialog";
 
@@ -44,6 +47,75 @@ const shapeOptions: ShapeOption[] = [
 const fontSizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
 const fontFamilies = ["Arial", "Times New Roman", "Courier New", "Georgia", "Verdana"];
 
+const getModeInstructions = (mode: {
+  isSelectionMode: boolean;
+  isTextMode: boolean;
+  activeShape: ShapeType;
+}) => {
+  if (mode.isSelectionMode) {
+    return {
+      icon: <MousePointer className="w-5 h-5 text-blue-500" />,
+      title: "Selection Mode",
+      instruction: "Click on any shape or text to select and modify it. Use Delete key to remove selected items."
+    };
+  }
+  if (mode.isTextMode) {
+    return {
+      icon: <Type className="w-5 h-5 text-green-500" />,
+      title: "Text Mode",
+      instruction: "Click anywhere on the canvas to add text. Select text to change font, size, or color."
+    };
+  }
+  if (mode.activeShape) {
+    const shapeInstructions: Record<NonNullable<ShapeType>, { title: string; instruction: string }> = {
+      line: { 
+        title: "Line Tool",
+        instruction: "Click and drag to draw a line. Adjust thickness and color from the tools panel."
+      },
+      rectangle: {
+        title: "Rectangle Tool",
+        instruction: "Click and drag to draw a rectangle. Modify size by dragging corners when selected."
+      },
+      circle: {
+        title: "Circle Tool",
+        instruction: "Click and drag to create a circle. The drag distance determines the radius."
+      },
+      triangle: {
+        title: "Triangle Tool",
+        instruction: "Click and drag to create a triangle. Resize and rotate when selected."
+      },
+      ellipse: {
+        title: "Ellipse Tool",
+        instruction: "Click and drag to draw an ellipse. Drag horizontally and vertically to set dimensions."
+      },
+      highlight: {
+        title: "Highlight Tool",
+        instruction: "Click and drag to highlight an area. Adjust opacity and color from the tools panel."
+      },
+      cover: {
+        title: "Cover Tool",
+        instruction: "Click and drag to cover sensitive information with a black rectangle."
+      },
+      text: {
+        title: "Text Tool",
+        instruction: "Click to add text. Select text to modify font properties."
+      }
+    };
+
+    return {
+      icon: shapeOptions.find(s => s.type === mode.activeShape)?.icon,
+      title: shapeInstructions[mode.activeShape].title,
+      instruction: shapeInstructions[mode.activeShape].instruction
+    };
+  }
+
+  return {
+    icon: <MousePointer className="w-5 h-5 text-gray-500" />,
+    title: "Select a Tool",
+    instruction: "Choose a tool from the panel to start editing your image."
+  };
+};
+
 const FileViewer = ({ file }: FileViewerProps) => {
   const [imageUrl, setImageUrl] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +141,7 @@ const FileViewer = ({ file }: FileViewerProps) => {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [originalFormat, setOriginalFormat] = useState<string>("");
+  const [isInstructionsCollapsed, setIsInstructionsCollapsed] = useState(false);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -600,8 +673,49 @@ const FileViewer = ({ file }: FileViewerProps) => {
           {/* Main Content */}
           <div className="flex gap-6 h-[calc(100vh-120px)]">
             {/* Canvas Section */}
-            <div className="flex-1 bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="flex-1 bg-white rounded-xl shadow-lg overflow-hidden relative">
               <div className="relative w-full h-full flex items-center justify-center bg-[#f8fafc] p-4">
+                {/* Mode Indicator - Now in top-right corner and collapsible */}
+                <div className="absolute top-4 right-4 z-10">
+                  <div 
+                    className={`bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 transition-all duration-300 hover:bg-white
+                      ${isInstructionsCollapsed ? 'w-12' : 'w-[300px]'}`}
+                  >
+                    <div className="flex items-center">
+                      {!isInstructionsCollapsed && (
+                        <>
+                          <div className="flex items-center gap-3 p-3 flex-1">
+                            <div className="w-10 h-10 bg-gray-50/80 rounded-xl flex items-center justify-center flex-shrink-0">
+                              {getModeInstructions({ isSelectionMode, isTextMode, activeShape }).icon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-medium text-gray-900 truncate">
+                                {getModeInstructions({ isSelectionMode, isTextMode, activeShape }).title}
+                              </h3>
+                              <p className="text-sm text-gray-600 line-clamp-2">
+                                {getModeInstructions({ isSelectionMode, isTextMode, activeShape }).instruction}
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      <button
+                        onClick={() => setIsInstructionsCollapsed(!isInstructionsCollapsed)}
+                        className="p-3 text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        {isInstructionsCollapsed ? (
+                          <div className="w-6 h-6 bg-gray-50/80 rounded-lg flex items-center justify-center">
+                            <ChevronLeft className="w-4 h-4" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 bg-gray-50/80 rounded-lg flex items-center justify-center">
+                            <ChevronRight className="w-4 h-4" />
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <canvas ref={canvasRef} className="max-w-full max-h-full" />
               </div>
             </div>

@@ -2,7 +2,7 @@
 
 import { ChangeEvent, DragEvent, useState } from 'react';
 import { Upload } from 'lucide-react';
-import { cn } from "../lib/utils";
+// import { cn } from "../lib/utils";
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void;
