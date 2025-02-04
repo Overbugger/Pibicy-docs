@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Document base -->
+  <path d="M60 10 L60 30 L80 30 L80 90 L20 90 L20 10 Z" 
+        fill="#3B82F6" 
+        opacity="0.9"/>
+  <!-- Folded corner -->
+  <path d="M60 10 L80 30 L60 30 Z" 
+        fill="#2563EB"/>
+  
+  <!-- Upload arrow -->
+  <path d="M50 35 L50 65 M35 50 L50 35 L65 50" 
+        stroke="white" 
+        stroke-width="6" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        fill="none"/>
+  
+  <!-- Edit lines -->
+  <path d="M35 70 L65 70 M35 80 L55 80" 
+        stroke="white" 
+        stroke-width="4" 
+        stroke-linecap="round"/>
+</svg>

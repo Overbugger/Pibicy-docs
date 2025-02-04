@@ -1,116 +1,65 @@
-"use client"
+"use client";
 
-import { useCallback, useState } from "react"
-import { useDropzone, FileRejection } from "react-dropzone"
-import { Upload, FileUp } from "lucide-react"
-import { cn } from "../lib/utils"
+import { ChangeEvent, DragEvent, useState } from 'react';
+import { Upload } from 'lucide-react';
 
 interface FileUploadProps {
-  onFileUpload: (file: File) => void
-  isUploading?: boolean
-  maxSize?: number // in bytes, default 5MB
+  onFileSelect: (file: File) => void;
 }
 
-const FileUpload = ({ 
-  onFileUpload, 
-  isUploading = false, 
-  maxSize = 5 * 1024 * 1024 
-}: FileUploadProps) => {
-  const [isDragActive, setIsDragActive] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export const FileUpload = ({ onFileSelect }: FileUploadProps) => {
+  const [isDragging, setIsDragging] = useState(false);
 
-  const onDrop = useCallback(
-    (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
-      setError(null)
-      
-      if (rejectedFiles.length > 0) {
-        const { code, message } = rejectedFiles[0].errors[0]
-        if (code === 'file-too-large') {
-          setError(`File is too large. Max size is ${maxSize / (1024 * 1024)}MB`)
-        } else {
-          setError(message)
-        }
-        return
-      }
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
 
-      if (acceptedFiles.length > 0) {
-        onFileUpload(acceptedFiles[0])
-      }
-    },
-    [onFileUpload, maxSize],
-  )
+  const handleDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
 
-  const { getRootProps, getInputProps, isDragReject } = useDropzone({
-    onDrop,
-    accept: {
-      "image/jpeg": [".jpg", ".jpeg"],
-      "image/png": [".png"],
-    },
-    maxSize,
-    multiple: false,
-    onDragEnter: () => setIsDragActive(true),
-    onDragLeave: () => setIsDragActive(false),
-    disabled: isUploading,
-  })
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      onFileSelect(files[0]);
+    }
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      onFileSelect(files[0]);
+    }
+  };
 
   return (
     <div
-      {...getRootProps()}
-      className={cn(
-        "relative p-8 border-2 border-dashed rounded-lg transition-all duration-150 ease-in-out",
-        "hover:border-primary/50 hover:bg-muted/50",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        {
-          "border-primary/50 bg-primary/5 ring-2 ring-primary/20": isDragActive,
-          "border-destructive/50 bg-destructive/5 hover:border-destructive/50 hover:bg-destructive/5": isDragReject || error,
-          "pointer-events-none opacity-60": isUploading,
-          "border-muted-foreground/25": !isDragActive && !isDragReject && !isUploading && !error,
-        },
-      )}
-      role="button"
-      tabIndex={0}
-      aria-label="File upload area"
+      className={`border-2 border-dashed rounded-lg p-8 text-center ${
+        isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      <input {...getInputProps()} />
-      <div className="flex flex-col items-center justify-center gap-4 text-center">
-        <div
-          className={cn(
-            "p-4 rounded-full bg-muted/80 transition-transform duration-150",
-            isDragActive && "scale-110",
-            isUploading && "animate-pulse",
-          )}
-        >
-          {isUploading ? (
-            <Upload className="w-8 h-8 animate-bounce text-muted-foreground" aria-hidden="true" />
-          ) : (
-            <FileUp className="w-8 h-8 text-muted-foreground" aria-hidden="true" />
-          )}
-        </div>
-        <div className="space-y-2">
-          <p className="font-medium">
-            {error ? error :
-              isDragReject
-                ? "This file type is not supported"
-                : isUploading
-                  ? "Uploading file..."
-                  : isDragActive
-                    ? "Drop file here"
-                    : "Drag & drop an image here, or click to select"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Supported formats: JPG, JPEG, PNG (max {maxSize / (1024 * 1024)}MB)
-          </p>
-        </div>
+      <div className="flex flex-col items-center justify-center">
+        <Upload className="w-12 h-12 text-gray-400 mb-4" />
+        <p className="text-lg mb-2">Drag and drop your file here</p>
+        <p className="text-sm text-gray-500 mb-4">or</p>
+        <label className="cursor-pointer bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+          Choose File
+          <input
+            type="file"
+            className="hidden"
+            onChange={handleFileChange}
+            accept="image/*,.pdf"
+          />
+        </label>
       </div>
-      {isDragActive && (
-        <div
-          className="absolute inset-0 rounded-lg bg-primary/10 animate-in fade-in-0 duration-150"
-          aria-hidden="true"
-        />
-      )}
     </div>
-  )
-}
-
-export default FileUpload
-
+  );
+};
